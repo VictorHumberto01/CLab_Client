@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 
-const MonacoEditor = ({ code, setCode, language = 'c' }) => {
+const MonacoEditor = ({ code, setCode, language = 'c', triggerResize }) => {
   const editorRef = useRef(null);
 
   const handleEditorDidMount = (editor, monaco) => {
@@ -26,6 +26,16 @@ const MonacoEditor = ({ code, setCode, language = 'c' }) => {
       }
     });
   };
+
+  // Trigger resize when needed
+  useEffect(() => {
+    if (editorRef.current && triggerResize) {
+      // Small delay to ensure DOM has updated
+      setTimeout(() => {
+        editorRef.current.layout();
+      }, 100);
+    }
+  }, [triggerResize]);
 
   return (
     <div className="flex-1 h-full">

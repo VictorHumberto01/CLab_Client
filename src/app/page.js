@@ -37,11 +37,21 @@ int main() {
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
   const textareaRef = useRef(null);
 
+  // Trigger for Monaco Editor resize
+  const [resizeTrigger, setResizeTrigger] = useState(0);
+
+  // Effect to trigger Monaco Editor resize when AI panel visibility changes
+  useEffect(() => {
+    setResizeTrigger(prev => prev + 1);
+  }, [showAiPanel]);
+
   // Run code in cloud server
   const runInCloud = async () => {
     setIsRunning(true);
+    setIsAnalyzing(true);
     setOutput("");
     setError("");
+    setAiAnalysis(""); // Clear previous analysis
 
     try {
       const response = await fetch("http://localhost:8080/compile", {
@@ -62,12 +72,18 @@ int main() {
       } else {
         setOutput(result.output || "");
       }
+
+      // Update AI analysis with server response
+      if (result.analysis) {
+        setAiAnalysis(result.analysis);
+      }
     } catch (err) {
       setError(
         "Failed to connect to compiler service. Make sure your Go API is running on the main server",
       );
     } finally {
       setIsRunning(false);
+      setIsAnalyzing(false);
     }
   };
 
@@ -106,55 +122,6 @@ int main() {
     }, 0);
   };
 
-  // Simulate AI analysis
-  const analyzeCode = async () => {
-    setIsAnalyzing(true);
-    setAiAnalysis("");
-
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // Mock AI analysis based on code content
-    let analysis = "## Code Analysis\n\n";
-
-    if (code.includes("scanf")) {
-      analysis +=
-        "✅ **Input Detection**: Found `scanf` statements requiring user input.\n\n";
-    }
-
-    if (code.includes("printf")) {
-      analysis +=
-        "✅ **Output Operations**: Code includes output statements.\n\n";
-    }
-
-    if (code.includes("int main")) {
-      analysis += "✅ **Structure**: Valid C program structure detected.\n\n";
-    }
-
-    analysis += "### Suggestions:\n";
-    analysis += "- Consider adding input validation\n";
-    analysis += "- Use more descriptive variable names\n";
-    analysis += "- Add error handling for scanf\n\n";
-
-    analysis += "### Security Notes:\n";
-    analysis += "- `scanf` can be vulnerable to buffer overflow\n";
-    analysis += "- Consider using `fgets` for string input";
-
-    setAiAnalysis(analysis);
-    setIsAnalyzing(false);
-  };
-
-  // Auto-analyze when code changes (debounced)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (code.trim() && showAiPanel) {
-        analyzeCode();
-      }
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [code, showAiPanel]);
-
   return (
     <main className="flex flex-col h-screen bg-gray-950">
       <MenuBar 
@@ -173,6 +140,7 @@ int main() {
               code={code}
               setCode={setCode}
               language="c"
+              triggerResize={resizeTrigger}
             />
           </div>
 
