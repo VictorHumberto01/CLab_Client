@@ -4,6 +4,10 @@ Uma plataforma local e segura para ensino de programação em linguagem C, desen
 
 ![CLab Logo](https://img.shields.io/badge/CLab-C%20Learning%20Platform-blue?style=for-the-badge)
 
+## 📸 Screenshot
+
+![CLab Interface](/public/clab.png)
+
 ## ✨ Características Principais
 
 - 🔒 **100% Local**: Funciona completamente offline, sem dependências externas
@@ -99,7 +103,7 @@ Criar uma plataforma educacional que facilite o aprendizado da linguagem C para 
 - [ ] Sistema de códigos de acesso
 - [x] Editor de código integrado
 - [x] Compilação e execução segura em Go
-- [ ] Feedback básico via IA
+- [x] Feedback básico via IA
 
 ### 🔄 Fase 2: Melhorias
 - [ ] Histórico detalhado de tentativas
