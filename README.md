@@ -97,8 +97,8 @@ Criar uma plataforma educacional que facilite o aprendizado da linguagem C para 
 - [ ] CRUD de professores pelo administrador
 - [ ] Criação e gerenciamento de salas
 - [ ] Sistema de códigos de acesso
-- [ ] Editor de código integrado
-- [ ] Compilação e execução segura em Go
+- [x] Editor de código integrado
+- [x] Compilação e execução segura em Go
 - [ ] Feedback básico via IA
 
 ### 🔄 Fase 2: Melhorias
@@ -109,11 +109,11 @@ Criar uma plataforma educacional que facilite o aprendizado da linguagem C para 
 - [ ] Métricas e analytics
 
 ### 🎯 Fase 3: Expansão
-- [ ] Suporte a Python e JavaScript
+- [ ] Suporte a outras linguagens
 - [ ] Sistema de gamificação
 - [ ] Exportação de relatórios
 - [ ] Temas e personalização
-- [ ] Sistema de backup local
+
 
 ## 🔐 Segurança
 
