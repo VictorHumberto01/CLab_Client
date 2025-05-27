@@ -1,11 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { FileText } from "lucide-react";
+import IntroModal from "../components/IntroModal";
 import MenuBar from "../components/MenuBar";
-import CodeEditor from "../components/Editor/CodeEditor";
-import TerminalPanel from "../components/Terminal/TerminalPanel";
 import AnalysisPanel from "../components/AIPanel/AnalysisPanel";
+
+// Import Monaco Editor dynamically to avoid SSR issues
+const MonacoEditor = dynamic(
+  () => import("../components/Editor/MonacoEditor"),
+  { ssr: false }
+);
 
 const IDE = () => {
   const [code, setCode] = useState(`#include <stdio.h>
@@ -15,7 +21,6 @@ int main() {
 
     return 0;
 }`);
-
   const [input, setInput] = useState("5 10");
   const [output, setOutput] = useState("");
   const [error, setError] = useState("");
@@ -23,6 +28,7 @@ int main() {
   const [aiAnalysis, setAiAnalysis] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(true);
+  const [showIntro, setShowIntro] = useState(true);
 
   // IntelliSense states
   const [suggestions, setSuggestions] = useState([]);
@@ -58,7 +64,7 @@ int main() {
       }
     } catch (err) {
       setError(
-        "Failed to connect to compiler service. Make sure your Go API is running on localhost:8080",
+        "Failed to connect to compiler service. Make sure your Go API is running on the main server",
       );
     } finally {
       setIsRunning(false);
@@ -150,55 +156,64 @@ int main() {
   }, [code, showAiPanel]);
 
   return (
-    <div className="h-screen bg-gray-950 text-white flex flex-col">
+    <main className="flex flex-col h-screen bg-gray-950">
       <MenuBar 
         runInCloud={runInCloud}
         isRunning={isRunning}
         showAiPanel={showAiPanel}
         setShowAiPanel={setShowAiPanel}
       />
-
-      <div className="flex-1 flex">
-        <div className="flex-1 flex flex-col">
-          <div className="bg-gray-900 px-4 py-2 border-b border-gray-800">
-            <div className="flex items-center space-x-2">
-              <FileText className="w-4 h-4 text-gray-400" />
-              <span className="text-sm font-medium">main.c</span>
-              <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
-            </div>
+      
+      <div className="flex flex-1 min-h-0">
+        {/* Main Editor + IO Section */}
+        <div className="flex flex-col flex-1">
+          {/* Editor Area */}
+          <div className="flex-1 min-h-0">
+            <MonacoEditor 
+              code={code}
+              setCode={setCode}
+              language="c"
+            />
           </div>
 
-          <CodeEditor 
-            code={code}
-            setCode={setCode}
-            cursorPosition={cursorPosition}
-            setCursorPosition={setCursorPosition}
-            suggestions={suggestions}
-            setSuggestions={setSuggestions}
-            showSuggestions={showSuggestions}
-            setShowSuggestions={setShowSuggestions}
-            selectedSuggestion={selectedSuggestion}
-            setSelectedSuggestion={setSelectedSuggestion}
-            applySuggestion={applySuggestion}
-          />
+          {/* Input/Output Panel */}
+          <div className="h-48 border-t border-gray-800 bg-gray-900/50 backdrop-blur-sm flex">
+            {/* Input Section */}
+            <div className="flex-1 p-4 border-r border-gray-800">
+              <h2 className="text-sm font-medium text-gray-400 mb-2">Input</h2>
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                className="w-full h-28 bg-gray-950 text-gray-300 font-mono text-sm p-2 rounded border border-gray-800 resize-none focus:outline-none focus:border-blue-500"
+                placeholder="Program input..."
+              />
+            </div>
 
-          <TerminalPanel 
-            input={input}
-            setInput={setInput}
-            output={output}
-            error={error}
-            isRunning={isRunning}
-          />
+            {/* Output Section */}
+            <div className="flex-1 p-4">
+              <h2 className="text-sm font-medium text-gray-400 mb-2">Output</h2>
+              <div className="w-full h-28 bg-gray-950 text-gray-300 font-mono text-sm p-2 rounded border border-gray-800 overflow-auto">
+                {error ? (
+                  <span className="text-red-400">{error}</span>
+                ) : (
+                  output || <span className="text-gray-500">Program output will appear here...</span>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
+        {/* AI Analysis Panel */}
         {showAiPanel && (
-          <AnalysisPanel 
+          <AnalysisPanel
             aiAnalysis={aiAnalysis}
             isAnalyzing={isAnalyzing}
           />
         )}
       </div>
-    </div>
+
+      <IntroModal isOpen={showIntro} onClose={() => setShowIntro(false)} />
+    </main>
   );
 };
 

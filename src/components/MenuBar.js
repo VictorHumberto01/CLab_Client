@@ -65,7 +65,7 @@ const MenuBar = ({ runInCloud, isRunning, showAiPanel, setShowAiPanel }) => {
           ) : (
             <Cloud className="w-4 h-4" />
           )}
-          <span className="text-sm">Run in Cloud</span>
+          <span className="text-sm">Run</span>
         </button>
 
         <button className="flex items-center space-x-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-md transition-colors">
