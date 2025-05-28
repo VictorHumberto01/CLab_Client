@@ -54,15 +54,22 @@ int main() {
     setAiAnalysis(""); // Clear previous analysis
 
     try {
+      // Check if input contains newlines to determine format
+      const hasMultipleLines = input.includes('\n');
+      const requestBody = {
+        code: code,
+        ...(hasMultipleLines 
+          ? { inputLines: input.split('\n').filter(line => line.trim()) }
+          : { input: input }
+        )
+      };
+
       const response = await fetch("http://localhost:8080/compile", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          code: code,
-          input: input,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const result = await response.json();

@@ -131,6 +131,14 @@ const AnalysisPanel = ({ aiAnalysis, isAnalyzing }) => {
   };
 
   const generateSummary = () => {
+    if (!aiAnalysis || !parsedAnalysis.sections.length) {
+      return {
+        positive: "Desculpe, não conseguimos analisar seu código neste momento.",
+        suggestions: "Por favor, tente novamente mais tarde.",
+        nextSteps: "Se o problema persistir, verifique sua conexão com o servidor."
+      };
+    }
+
     const positivePoints = [];
     const suggestions = [];
     const nextSteps = [];
