@@ -8,6 +8,7 @@ import MenuBar from "../components/MenuBar";
 import AnalysisPanel from "../components/AIPanel/AnalysisPanel"; 
 import Terminal from "../components/Terminal/Terminal";
 import { useAuth } from "../context/AuthContext";
+import { getWsUrl } from "../utils/api";
 
 // Import Monaco Editor dynamically to avoid SSR issues
 const MonacoEditor = dynamic(
@@ -57,7 +58,7 @@ int main() {
   // Connect WebSocket
   const connectWebSocket = () => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `ws://localhost:8080/ws`; 
+    const wsUrl = `${getWsUrl()}/ws`; 
     
     // Close existing connection if any
     if (wsRef.current) {

@@ -48,4 +48,17 @@ api.interceptors.response.use(
   }
 );
 
+export const getServerUrl = () => {
+  if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.getItem === 'function') {
+    const customIp = window.localStorage.getItem('clab-server-ip');
+    if (customIp) return customIp;
+  }
+  return 'http://localhost:8080';
+};
+
+export const getWsUrl = () => {
+  const httpUrl = getServerUrl();
+  return httpUrl.replace(/^http/, 'ws');
+};
+
 export default api;
