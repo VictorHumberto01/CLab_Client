@@ -19,54 +19,90 @@ import {
 
 // --- Sub-components for Views ---
 
-const MonitoringView = ({ activeCompilations }) => {
+const MonitoringView = () => {
+    const [history, setHistory] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const router = useRouter();
+
+    const fetchHistory = async () => {
+        try {
+            const res = await api.get('/history?limit=20');
+            if (res.data.data) {
+                setHistory(res.data.data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch history:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchHistory();
+        const interval = setInterval(fetchHistory, 5000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const handleRunCode = (code) => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('clab-restore-code', code);
+            router.push('/');
+        }
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
              <header className="mb-8 border-b border-gray-800 pb-4 app-drag">
                 <div className="flex items-center space-x-3">
                     <Monitor className="text-blue-500" size={28} />
                     <h1 className="text-2xl font-bold text-white">
-                        Monitoramento ao Vivo
+                        Histórico de Atividades
                     </h1>
                 </div>
-                <p className="text-gray-400 mt-2 text-sm">Visualização em tempo real das atividades de compilação dos alunos.</p>
+                <p className="text-gray-400 mt-2 text-sm">Visualização das últimas execuções de código dos alunos.</p>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {Object.values(activeCompilations).length === 0 && (
+            <div className="grid grid-cols-1 gap-4">
+                {history.length === 0 && !loading && (
                     <div className="col-span-full text-center py-32 border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-900/30">
                         <Monitor size={48} className="mx-auto mb-4 text-zinc-700" />
-                        <h3 className="text-zinc-500 font-medium text-lg">Nenhuma sessão ativa</h3>
-                        <p className="text-zinc-600 text-sm mt-1">Quando os alunos executarem código, aparecerá aqui automaticamente.</p>
+                        <h3 className="text-zinc-500 font-medium text-lg">Nenhuma atividade recente</h3>
+                        <p className="text-zinc-600 text-sm mt-1">O histórico de compilações aparecerá aqui.</p>
                     </div>
                 )}
 
-                {Object.values(activeCompilations).map((comp) => (
-                    <div key={comp.id} className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden flex flex-col shadow-xl hover:ring-1 hover:ring-blue-500/50 transition-all">
-                        <div className="bg-zinc-950 px-4 py-3 flex items-center justify-between border-b border-zinc-800">
-                            <div className="flex items-center space-x-2">
-                                <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400">
-                                    <User size={14} />
+                {history.map((item) => (
+                    <div key={item.ID} className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 flex flex-col md:flex-row gap-4 hover:border-zinc-700 transition-colors">
+                        <div className="flex-1">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-8 h-8 rounded-full bg-blue-900/30 flex items-center justify-center text-blue-400 font-bold text-xs">
+                                        {item.User?.Name ? item.User.Name[0].toUpperCase() : <User size={14} />}
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-white">{item.User?.Name || "Aluno Desconhecido"}</div>
+                                        <div className="text-xs text-zinc-500">{new Date(item.CreatedAt).toLocaleString()}</div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <span className="font-medium text-sm text-gray-200 block leading-tight">{comp.name || "Desconhecido"}</span>
-                                    <span className="text-[10px] text-zinc-500 block leading-tight">ID: {comp.id}</span>
+                                <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${item.Error ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                                    {item.Error ? 'Erro' : 'Sucesso'}
                                 </div>
                             </div>
-                            <div className="flex items-center space-x-2 bg-zinc-900 rounded-full px-2 py-1">
-                                <span className={`w-1.5 h-1.5 rounded-full ${comp.status === 'Running' ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
-                                <span className="text-[10px] text-zinc-400 font-medium uppercase">{comp.status === 'Running' ? 'Executando' : 'Concluído'}</span>
+                            
+                            <div className="bg-black/50 rounded p-2 font-mono text-xs text-zinc-400 overflow-hidden max-h-24 relative group">
+                                <div className="opacity-50 text-[10px] mb-1 select-none">Output:</div>
+                                {item.Output || item.Error}
                             </div>
                         </div>
-                        <div className="flex-1 bg-black p-3 h-56 overflow-auto font-mono text-[11px] leading-relaxed text-gray-300 whitespace-pre-wrap scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-                            {comp.output}
-                        </div>
-                        <div className="bg-zinc-950 px-3 py-2 border-t border-zinc-800 text-[10px] text-zinc-500 flex items-center justify-between">
-                             <div className="flex items-center">
-                                <Clock size={10} className="mr-1.5" />
-                                {new Date(comp.timestamp).toLocaleTimeString()}
-                             </div>
-                             <span className="text-zinc-700 font-mono">C</span>
+
+                        <div className="flex items-center justify-end md:border-l md:border-zinc-800 md:pl-4">
+                            <button 
+                                onClick={() => handleRunCode(item.Code)}
+                                className="flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-blue-600 hover:text-white text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                            >
+                                <TerminalIcon size={16} />
+                                <span>Executar Código</span>
+                            </button>
                         </div>
                     </div>
                 ))}
@@ -369,8 +405,7 @@ const UsersView = ({ user }) => {
 export default function TeacherDashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("monitoring");
-  const [activeCompilations, setActiveCompilations] = useState({}); 
+  const [activeTab, setActiveTab] = useState("monitoring"); 
 
   useEffect(() => {
     if (!loading && (!user || (user.role !== "TEACHER" && user.role !== "ADMIN"))) {
@@ -378,62 +413,7 @@ export default function TeacherDashboard() {
     }
   }, [user, loading, router]);
 
-  // WebSocket Logic (Preserved)
-  useEffect(() => {
-    if (!user) return;
-
-    const wsUrl = `${getWsUrl()}/ws`; 
-    const socket = new WebSocket(wsUrl);
-
-    socket.onopen = () => { console.log("Monitor Connected"); };
-
-    socket.onmessage = (event) => {
-        try {
-            const msg = JSON.parse(event.data);
-            if (msg.type === "compile_start") {
-                setActiveCompilations(prev => ({
-                    ...prev,
-                    [msg.userId]: {
-                        id: msg.userId,
-                        name: msg.userName,
-                        output: msg.payload + "\n",
-                        status: "Running",
-                        timestamp: msg.timestamp
-                    }
-                }));
-            } else if (msg.type === "output_chunk") {
-                setActiveCompilations(prev => {
-                     const existing = prev[msg.userId] || { id: msg.userId, name: msg.userName, output: "", status: "Running" };
-                     return {
-                         ...prev,
-                         [msg.userId]: {
-                             ...existing,
-                             output: existing.output + msg.payload,
-                             lastUpdate: Date.now()
-                         }
-                     };
-                });
-            } else if (msg.type === "compile_end") {
-                 setActiveCompilations(prev => {
-                     const existing = prev[msg.userId];
-                     if (!existing) return prev;
-                     return {
-                         ...prev,
-                         [msg.userId]: {
-                             ...existing,
-                             status: "Completed",
-                             output: existing.output + "\n" + msg.payload
-                         }
-                     };
-                });
-            }
-        } catch (e) {
-            console.error("Monitor Error", e);
-        }
-    };
-
-    return () => { socket.close(); };
-  }, [user]);
+  console.log("Teacher dashboard loaded");
 
   if (loading || !user) return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Loading...</div>;
 
@@ -499,7 +479,7 @@ export default function TeacherDashboard() {
         {/* Main Content */}
         <main className="flex-1 ml-64 min-h-screen bg-[#09090b]">
             <div className="max-w-7xl mx-auto p-8 lg:p-12">
-                {activeTab === "monitoring" && <MonitoringView activeCompilations={activeCompilations} />}
+                {activeTab === "monitoring" && <MonitoringView />}
                 {activeTab === "classrooms" && <ClassroomsView />}
                 {activeTab === "users" && <UsersView user={user} />}
                 {activeTab === "exams" && <ExamModeView />}
