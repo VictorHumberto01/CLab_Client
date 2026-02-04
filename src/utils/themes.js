@@ -1,7 +1,7 @@
 export const DEFAULT_THEMES = [
   {
     id: 'zinc',
-    name: 'Zinc (Default)',
+    name: 'Zinc (Padrão)',
     colors: {
       background: '#09090b',
       foreground: '#e4e4e7',
@@ -49,7 +49,7 @@ export const DEFAULT_THEMES = [
   },
   {
     id: 'latte',
-    name: 'Latte (Light)',
+    name: 'Latte (Claro)',
     colors: {
       background: '#eff1f5',
       foreground: '#4c4f69',

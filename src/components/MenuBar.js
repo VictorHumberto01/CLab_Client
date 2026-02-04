@@ -105,12 +105,21 @@ const MenuBar = ({ runInCloud, isRunning, showAiPanel, setShowAiPanel }) => {
              )}
           </div>
         ) : (
+          <div className="flex items-center space-x-2">
+             <Link 
+                href="/settings"
+                className="p-1.5 text-secondary hover:text-foreground hover:bg-surface-hover rounded transition-colors"
+                title="Configurações"
+             >
+                 <Settings size={16} />
+             </Link>
              <Link 
                 href="/login"
                 className="px-3 py-1 text-xs font-medium text-foreground hover:bg-surface-hover rounded transition-colors"
              >
                  Entrar
              </Link>
+          </div>
         )}
       </div>
     </div>

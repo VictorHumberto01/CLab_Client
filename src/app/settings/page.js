@@ -2,17 +2,69 @@
 
 import React, { useState } from "react";
 import { useTheme } from "../../context/ThemeContext";
-import { Check, Trash2, Plus, ArrowLeft, Upload, Palette, Server, Info, Code, Terminal, Cpu, Database, Monitor } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import { Check, Trash2, Plus, ArrowLeft, Upload, Palette, Server, Info, Code, Terminal, Cpu, Database, Monitor, Shield, User } from "lucide-react";
 import Link from "next/link";
 
 const SettingsPage = () => {
   const { currentTheme, availableThemes, changeTheme, addCustomTheme, removeCustomTheme } = useTheme();
+  const { user } = useAuth();
   const [jsonInput, setJsonInput] = useState("");
+  const [browserInfo, setBrowserInfo] = useState({});
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const ua = window.navigator.userAgent;
+      
+      const getOS = () => {
+        if (ua.indexOf("Win") !== -1) return "Windows";
+        if (ua.indexOf("Mac") !== -1) return "MacOS";
+        if (ua.indexOf("Linux") !== -1) return "Linux";
+        return "Unknown";
+      };
+
+      const getElectronVersion = () => {
+        const match = ua.match(/Electron\/([\d\.]+)/);
+        return match ? match[1] : "Unknown (Web)";
+      };
+
+      setBrowserInfo({
+        os: getOS(),
+        electron: getElectronVersion(),
+        build: "04022026-0.0.1"
+      });
+    }
+  }, []);
   const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState("appearance");
   const [saveMessage, setSaveMessage] = useState("");
 
   const [serverIp, setServerIp] = useState("http://localhost:8080");
+
+  // Neofetch animation state
+  const [typedCommand, setTypedCommand] = useState("");
+  const [neofetchStage, setNeofetchStage] = useState(0); // 0: hidden, 1: head, 2: specs, 3: palette
+
+  React.useEffect(() => {
+    if (activeSection === 'about') {
+      setTypedCommand("");
+      setNeofetchStage(0);
+      let i = 0;
+      const cmd = "neofetch";
+      const interval = setInterval(() => {
+        setTypedCommand(cmd.substring(0, i + 1));
+        i++;
+        if (i === cmd.length) {
+          clearInterval(interval);
+          // Sequence the loading stages
+          setTimeout(() => setNeofetchStage(1), 600);  // Initial lag -> Header/Logo
+          setTimeout(() => setNeofetchStage(2), 1000); // Then Specs
+          setTimeout(() => setNeofetchStage(3), 1400); // Last Palette
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, [activeSection]);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -90,23 +142,31 @@ const SettingsPage = () => {
           : 'border-border bg-background hover:border-secondary'
       }`}
     >
-      <div className="flex justify-between items-center mb-2">
-        <code className="text-xs text-foreground">{theme.name}</code>
-        {currentTheme.id === theme.id && <Check size={12} className="text-primary" />}
+      {/* Delete button - top right, only on hover */}
+      {!['zinc', 'dracula', 'monokai', 'latte'].includes(theme.id) && (
+        <button 
+          onClick={(e) => { e.stopPropagation(); if(confirm(`Excluir ${theme.name}?`)) removeCustomTheme(theme.id); }}
+          className="absolute top-1.5 right-1.5 p-0.5 text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 rounded transition-all z-10"
+        >
+          <Trash2 size={10} />
+        </button>
+      )}
+      
+      {/* Selected indicator - bottom right */}
+      {currentTheme.id === theme.id && (
+        <div className="absolute bottom-1.5 right-1.5 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
+          <Check size={10} className="text-white" />
+        </div>
+      )}
+      
+      <div className="flex items-center mb-2 pr-4">
+        <code className="text-xs text-foreground truncate">{theme.name}</code>
       </div>
       <div className="flex space-x-1">
         {[theme.colors.background, theme.colors.surface, theme.colors.primary, theme.colors.accent].map((c, i) => (
           <div key={i} className="w-4 h-4 rounded-sm border border-border" style={{ backgroundColor: c }} />
         ))}
       </div>
-      {!['zinc', 'dracula', 'monokai', 'latte'].includes(theme.id) && (
-        <button 
-          onClick={(e) => { e.stopPropagation(); if(confirm(`Excluir ${theme.name}?`)) removeCustomTheme(theme.id); }}
-          className="absolute top-1.5 right-1.5 p-0.5 text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 rounded transition-all"
-        >
-          <Trash2 size={10} />
-        </button>
-      )}
     </div>
   );
 
@@ -120,10 +180,10 @@ const SettingsPage = () => {
     <main className="flex flex-col h-screen bg-background text-foreground overflow-hidden font-mono">
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
-        <div className="w-44 border-r border-border bg-surface flex flex-col">
-          {/* Header */}
-          <div className="p-3 pt-[50px] border-b border-border">
-            <code className="text-xs text-secondary">~/configurações</code>
+        <div className="w-44 border-r border-border bg-surface flex flex-col no-drag">
+          {/* Header - Drag Region */}
+          <div className="p-3 pt-[50px] border-b border-border app-drag">
+            <code className="text-xs text-secondary pointer-events-none">~/configurações</code>
           </div>
 
           {/* Navigation */}
@@ -157,7 +217,7 @@ const SettingsPage = () => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 no-drag">
           <div className="max-w-xl">
 
             {activeSection === 'appearance' && (
@@ -240,13 +300,15 @@ const SettingsPage = () => {
               <div className="space-y-6">
                 <div className="flex items-center space-x-2 text-secondary text-xs">
                   <span className="text-primary">$</span>
-                  <span>neofetch</span>
+                  <span>{typedCommand}</span>
+                  {neofetchStage === 0 && <span className="w-1.5 h-3 bg-secondary animate-pulse"/>}
                 </div>
 
-                <div className="bg-background border border-border rounded p-4">
+                {neofetchStage > 0 && (
+                <div className="bg-background border border-border rounded p-4 animate-in fade-in zoom-in-95 duration-300">
                   <div className="flex items-start space-x-4">
                     {/* ASCII Art Logo */}
-                    <pre className="text-primary text-[8px] leading-tight hidden sm:block">{`
+                    <pre className="text-primary text-[8px] leading-tight hidden sm:block select-none">{`
    _____ _       _     
   / ____| |     | |    
  | |    | | __ _| |__  
@@ -265,32 +327,53 @@ const SettingsPage = () => {
                         <span className="text-primary w-20">version</span>
                         <span className="text-foreground">0.1.0-alpha</span>
                       </div>
-                      <div className="border-t border-border my-2" />
-                      <div className="flex">
-                        <span className="text-secondary w-20">frontend</span>
-                        <span className="text-foreground">Next.js 14</span>
-                      </div>
-                      <div className="flex">
-                        <span className="text-secondary w-20">backend</span>
-                        <span className="text-foreground">Go + Gin</span>
-                      </div>
-                      <div className="flex">
-                        <span className="text-secondary w-20">editor</span>
-                        <span className="text-foreground">Monaco</span>
-                      </div>
-                      <div className="flex">
-                        <span className="text-secondary w-20">runtime</span>
-                        <span className="text-foreground">Electron</span>
-                      </div>
-                      <div className="border-t border-border my-2" />
-                      <div className="flex space-x-1">
-                        {['bg-red-500', 'bg-yellow-500', 'bg-green-500', 'bg-cyan-500', 'bg-blue-500', 'bg-purple-500'].map((c, i) => (
-                          <div key={i} className={`w-3 h-3 rounded-sm ${c}`} />
-                        ))}
-                      </div>
+
+                      {/* STAGE 2: Specs */}
+                      {neofetchStage >= 2 && (
+                        <div className="animate-in slide-in-from-left-2 duration-300 fade-in text-[10px] font-mono">
+                          <div className="border-t border-border my-2" />
+                          
+                          <div className="grid grid-cols-[100px_1fr] gap-x-2">
+                            <span className="text-secondary text-right">CLab Server:</span>
+                            <span className="text-foreground">1.0.0 (Go/Gin)</span>
+
+                            <span className="text-secondary text-right">Build:</span>
+                            <span className="text-foreground">{browserInfo.build}</span>
+
+                            <span className="text-secondary text-right">Electron:</span>
+                            <span className="text-foreground">{browserInfo.electron}</span>
+
+                            <span className="text-secondary text-right">OS:</span>
+                            <span className="text-foreground">{browserInfo.os}</span>
+
+                            <span className="text-secondary text-right">Theme:</span>
+                            <span className="text-foreground">{currentTheme.name}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* STAGE 3: Palette */}
+                      {neofetchStage >= 3 && (
+                        <div className="animate-in slide-in-from-left-2 duration-300 fade-in delay-100">
+                          <div className="border-t border-border my-2" />
+                          <div className="flex space-x-1">
+                            {[
+                              currentTheme.colors.background,
+                              currentTheme.colors.surface, 
+                              currentTheme.colors.primary,
+                              currentTheme.colors.accent,
+                              currentTheme.colors.secondary,
+                              currentTheme.colors.foreground
+                            ].map((c, i) => (
+                              <div key={i} className="w-3 h-3 rounded-sm border border-border" style={{ backgroundColor: c }} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
+                )}
               </div>
             )}
 
