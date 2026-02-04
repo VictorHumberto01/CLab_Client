@@ -9,13 +9,14 @@ import {
   User,
   LogOut,
   ChevronDown,
-  Code
+  Code,
+  Monitor
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-const MenuBar = ({ runInCloud, isRunning, showAiPanel, setShowAiPanel }) => {
+const MenuBar = ({ runInCloud, stopCode, isRunning, showAiPanel, setShowAiPanel }) => {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
@@ -32,14 +33,23 @@ const MenuBar = ({ runInCloud, isRunning, showAiPanel, setShowAiPanel }) => {
         <div className="h-4 w-px bg-border my-auto" />
 
         <div className="flex items-center space-x-1 no-drag">
-          <button
-            onClick={runInCloud}
-            disabled={isRunning}
-            className="flex items-center space-x-2 px-3 py-1 bg-green-600/10 hover:bg-green-600/20 text-green-500 border border-green-600/20 rounded text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-             {isRunning ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Play size={12} className="fill-current mr-1.5" />}
-             Executar
-          </button>
+          {isRunning ? (
+              <button
+                onClick={stopCode}
+                className="flex items-center space-x-2 px-3 py-1 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-600/20 rounded text-xs font-medium transition-all"
+              >
+                 <Loader2 size={12} className="animate-spin mr-1.5" />
+                 Parar
+              </button>
+          ) : (
+              <button
+                onClick={runInCloud}
+                className="flex items-center space-x-2 px-3 py-1 bg-green-600/10 hover:bg-green-600/20 text-green-500 border border-green-600/20 rounded text-xs font-medium transition-all"
+              >
+                 <Play size={12} className="fill-current mr-1.5" />
+                 Executar
+              </button>
+          )}
         </div>
       </div>
 
@@ -90,6 +100,16 @@ const MenuBar = ({ runInCloud, isRunning, showAiPanel, setShowAiPanel }) => {
                             <User size={14} className="mr-2 opacity-70" />
                             Meu Perfil
                         </Link>
+                        {(user.role === 'TEACHER' || user.role === 'ADMIN') && (
+                            <Link 
+                                href="/teacher"
+                                className="flex items-center px-3 py-1.5 text-xs text-foreground hover:bg-surface-hover rounded transition-colors"
+                                onClick={() => setShowProfileMenu(false)}
+                            >
+                                <Monitor size={14} className="mr-2 opacity-70" />
+                                Painel do Professor
+                            </Link>
+                        )}
                         <button 
                             onClick={() => {
                                 logout();

@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import { Terminal, Database } from "lucide-react";
+import { Terminal as TerminalIcon } from "lucide-react";
 import IntroModal from "../components/IntroModal";
 import MenuBar from "../components/MenuBar";
-import AnalysisPanel from "../components/AIPanel/AnalysisPanel";
-import api from "../utils/api";
+import AnalysisPanel from "../components/AIPanel/AnalysisPanel"; 
+import Terminal from "../components/Terminal/Terminal";
+import { useAuth } from "../context/AuthContext";
 
 // Import Monaco Editor dynamically to avoid SSR issues
 const MonacoEditor = dynamic(
@@ -18,28 +19,31 @@ const IDE = () => {
   const [code, setCode] = useState(`#include <stdio.h>
 
 int main() {
-    printf("Hello, World!");
-
+    printf("Hello, World!\\n");
     return 0;
 }`);
-  const [input, setInput] = useState("");
-  const [output, setOutput] = useState("");
-  const [error, setError] = useState("");
   const [isRunning, setIsRunning] = useState(false);
-  const [aiAnalysis, setAiAnalysis] = useState("");
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(true);
   const [showIntro, setShowIntro] = useState(true);
-
+  
+  // WebSocket State
+  const wsRef = useRef(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const terminalRef = useRef(null);
+  const { user } = useAuth();
+  
   // Trigger for Monaco Editor resize
   const [resizeTrigger, setResizeTrigger] = useState(0);
 
-  // Effect to trigger Monaco Editor resize when AI panel visibility changes
+  // AI State
+  const [aiAnalysis, setAiAnalysis] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
   useEffect(() => {
     setResizeTrigger(prev => prev + 1);
   }, [showAiPanel]);
 
-  // Restore code from history if available
+  // Restore code
   useEffect(() => {
     if (typeof window !== 'undefined') {
         const restoredCode = localStorage.getItem('clab-restore-code');
@@ -50,71 +54,188 @@ int main() {
     }
   }, []);
 
-  // Run code in cloud server
-  const runInCloud = async (overrideInputs = null) => {
-    setIsRunning(true);
-    setIsAnalyzing(true);
-    setOutput("");
-    setError("");
-    setAiAnalysis(""); // Clear previous analysis
-
-    try {
-      // Use overrideInputs if provided (though we removed the interactive terminal, keeping arg for flexibility)
-      // Otherwise use the manual input state
-      const inputToUse = typeof overrideInputs === 'string' ? overrideInputs : input;
-
-      const hasMultipleLines = inputToUse && inputToUse.includes('\n');
-      const requestBody = {
-        code: code,
-        ...(hasMultipleLines 
-          ? { inputLines: inputToUse.split('\n').filter(line => line.trim()) }
-          : { input: inputToUse }
-        )
-      };
-
-      // Use Axios API instance for consistent Auth and Logging
-      const response = await api.post("/compile", requestBody);
-      const result = response.data;
-
-      if (result.error) {
-        setError(result.error);
-      } else {
-        setOutput(result.output || "");
-      }
-
-      // Update AI analysis with server response
-      if (result.analysis) {
-        setAiAnalysis(result.analysis);
-      }
-    } catch (err) {
-      console.error("Compile Error:", err);
-      // Construct a more useful error message based on the error type
-      let errorMessage = "Failed to connect to compiler service.";
-      
-      if (err.code === "ERR_NETWORK") {
-         errorMessage += " Server is unreachable (Connection Refused).";
-      } else if (err.response) {
-         errorMessage += ` Server Error (${err.response.status}): ${err.response.data?.error || "Unknown Error"}`;
-      }
-      
-      setError(errorMessage);
-    } finally {
-      setIsRunning(false);
-      setIsAnalyzing(false);
+  // Connect WebSocket
+  const connectWebSocket = () => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `ws://localhost:8080/ws`; 
+    
+    // Close existing connection if any
+    if (wsRef.current) {
+        wsRef.current.close();
     }
+
+    const socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+      console.log("WebSocket Connected");
+      setIsConnected(true);
+      if (terminalRef.current?.term) {
+        terminalRef.current.term.writeln('\x1b[32m[Connected to CLab Compilation Server]\x1b[0m');
+      }
+    };
+
+    socket.onclose = () => {
+      console.log("WebSocket Disconnected");
+      setIsConnected(false);
+      // Don't nullify ws here immediately to avoid flickering, or do it if you want to ensure cleanup
+      // setWs(null); 
+       if (terminalRef.current?.term) {
+        terminalRef.current.term.writeln('\r\n\x1b[31m[Disconnected]\x1b[0m');
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error("WebSocket Error:", error);
+      setIsConnected(false);
+    };
+
+    socket.onmessage = (event) => {
+        try {
+            const text = event.data;
+            let outputText = text;
+            let jsonPayload = null;
+
+            // Robust JSON extraction for AI Analysis
+            // We look for the specific marker and try to extract the object
+            const marker = '{"type":"ai_analysis"';
+            const markerIndex = typeof text === 'string' ? text.indexOf(marker) : -1;
+
+            if (markerIndex !== -1) {
+                 // Found the potential start of the JSON
+                 // Strategy: Assume JSON ends at the last '}' in the string 
+                 // (This assumes the AI JSON is the last/main JSON object in the stream chunk)
+                 const lastBraceIndex = text.lastIndexOf('}');
+                 
+                 if (lastBraceIndex > markerIndex) {
+                     const jsonCandidate = text.substring(markerIndex, lastBraceIndex + 1);
+                     try {
+                         const parsed = JSON.parse(jsonCandidate);
+                         if (parsed.type === 'ai_analysis') {
+                             jsonPayload = parsed;
+                             
+                             // Construct the terminal output by removing the JSON part
+                             const preText = text.substring(0, markerIndex);
+                             const postText = text.substring(lastBraceIndex + 1);
+                             outputText = preText + postText;
+                         }
+                     } catch (e) {
+                         // Failed to parse extracted chunk, fall back to process original text
+                         console.warn("Failed to parse extracted AI JSON:", e);
+                     }
+                 }
+            } else {
+                 // Try parsing the whole text as JSON (fallback for clean messages)
+                 if (typeof text === 'string' && text.trim().startsWith('{')) {
+                     try {
+                         const msg = JSON.parse(text);
+                         if (msg.type === 'ai_analysis') {
+                             jsonPayload = msg;
+                             outputText = ""; // Don't print anything to terminal
+                         }
+                     } catch (e) {
+                         // Not valid JSON, process as text
+                     }
+                 }
+            }
+
+            // Handle AI Action
+            if (jsonPayload) {
+                 setAiAnalysis(jsonPayload.payload);
+                 setIsAnalyzing(false);
+                 setShowAiPanel(true);
+            }
+            
+            // Output to Terminal
+            if (outputText) {
+                if (terminalRef.current?.write) {
+                    terminalRef.current.write(outputText);
+                } else if (terminalRef.current?.term) {
+                    terminalRef.current.term.write(outputText);
+                }
+                
+                if (outputText.includes("Program exited")) {
+                    setIsRunning(false);
+                }
+                if (outputText.includes("Analyzing...")) {
+                    setIsAnalyzing(true);
+                }
+            }
+            
+        } catch (e) {
+            console.error("WS Message Error", e);
+        }
+    };
+
+    wsRef.current = socket;
+  };
+
+  useEffect(() => {
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+          wsRef.current.close();
+      }
+    };
+  }, []); // Run once on mount to setup initial connection
+
+  // Re-connect trigger (manual)
+  const handleConnect = () => {
+      connectWebSocket();
+  };
+
+  const handleTerminalData = (data) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "input", payload: data }));
+    }
+  };
+
+  const handleTerminalResize = ({ rows, cols }) => {
+     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+         wsRef.current.send(JSON.stringify({ type: "resize", rows: rows, cols: cols }));
+     }
+  };
+
+  const runCode = () => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        if (terminalRef.current?.term) {
+            terminalRef.current.term.writeln('\x1b[31m[Error] Not connected to server.\x1b[0m');
+        }
+        return;
+    }
+    
+    setIsRunning(true);
+    if (terminalRef.current?.term) {
+        terminalRef.current.term.clear();
+        terminalRef.current.term.writeln('\x1b[33m[Compiling and Running...]\x1b[0m');
+    }
+
+    // Send code
+    wsRef.current.send(JSON.stringify({ type: "run_code", payload: code }));
+  };
+
+  const stopCode = () => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: "stop" }));
+          setIsRunning(false); // Optimistic update
+          if (terminalRef.current?.term) {
+              terminalRef.current.term.writeln('\r\n\x1b[31m[Stopping process...]\x1b[0m');
+          }
+      }
   };
 
   return (
     <main className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
       <MenuBar 
-        runInCloud={() => runInCloud(null)}
+        runInCloud={runCode}
+        stopCode={stopCode}
         isRunning={isRunning}
         showAiPanel={showAiPanel}
         setShowAiPanel={setShowAiPanel}
       />
       
       <div className="flex flex-1 min-h-0 pt-0 px-0 pb-0 gap-0">
-        {/* Main Editor + IO Section */}
+        {/* Main Editor + Terminal Section */}
         <div className="flex flex-col flex-1 min-w-0">
           {/* Editor Area */}
           <div className="flex-1 min-h-0 border-r border-border bg-background">
@@ -126,52 +247,47 @@ int main() {
             />
           </div>
 
-          {/* Input/Output Panel */}
-          <div className="h-48 border-t border-border bg-surface relative">
-            <div className="grid grid-cols-2 h-full">
-                {/* Input Section */}
-                <div className="flex flex-col border-r border-border min-h-0">
-                <div className="px-3 py-1.5 border-b border-border flex items-center bg-surface-hover select-none">
-                    <Database size={12} className="mr-2 text-secondary" />
-                    <span className="text-[11px] font-semibold text-secondary uppercase tracking-wide">Entrada</span>
+          {/* Terminal Panel */}
+          <div className="h-64 border-t border-border bg-black relative flex flex-col">
+            <div className="px-3 py-1.5 border-b border-white/10 flex items-center justify-between bg-zinc-900 select-none text-white">
+                <div className="flex items-center">
+                    <TerminalIcon size={12} className="mr-2 text-zinc-400" />
+                    <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Terminal</span>
                 </div>
-                <textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    className="flex-1 w-full bg-background p-3 text-sm font-mono text-foreground resize-none focus:outline-none placeholder-secondary/50"
-                    placeholder="Entrada padrão (stdin)..."
-                />
-                </div>
-
-                {/* Output Section */}
-                <div className="flex flex-col min-h-0 relative">
-                <div className="px-3 py-1.5 border-b border-border flex items-center justify-between bg-surface-hover select-none">
-                    <div className="flex items-center">
-                        <Terminal size={12} className="mr-2 text-secondary" />
-                        <span className="text-[11px] font-semibold text-secondary uppercase tracking-wide">Terminal</span>
-                    </div>
-                    {isRunning && (
-                        <span className="text-[10px] text-accent font-mono flex items-center">
-                            <span className="w-1.5 h-1.5 rounded-full bg-accent mr-1.5 animate-pulse"/>
-                            Executando
+                <div className="flex items-center space-x-3">
+                     {isConnected ? (
+                        <span className="flex items-center text-[10px] text-green-500">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse"/>
+                            Online
+                        </span>
+                    ) : (
+                        <span className="flex items-center text-[10px] text-red-500">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5"/>
+                            Offline
                         </span>
                     )}
                 </div>
-                <div className="flex-1 w-full bg-background p-3 text-sm font-mono overflow-auto">
-                    {error ? (
-                    <div className="text-red-400 whitespace-pre-wrap font-mono relative pl-3">
-                        <span className="absolute left-0 top-1 w-0.5 h-3 bg-red-400" />
-                        {error}
+            </div>
+            
+            <div className="flex-1 w-full bg-black p-2 min-h-0 relative overflow-hidden group">
+                <Terminal 
+                    onData={handleTerminalData} 
+                    onResize={handleTerminalResize}
+                    terminalRef={terminalRef}
+                />
+                
+                {/* Disconnected Overlay */}
+                {!isConnected && (
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-10">
+                        <button 
+                            onClick={handleConnect}
+                            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm px-4 py-2 rounded-md border border-zinc-700 shadow-lg flex items-center transition-all duration-200"
+                        >
+                            <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse"/>
+                            Connect to Server
+                        </button>
                     </div>
-                    ) : (
-                    output ? (
-                        <div className="text-foreground whitespace-pre-wrap">{output}</div>
-                    ) : (
-                        <span className="text-secondary italic">Sem saída.</span>
-                    )
-                    )}
-                </div>
-                </div>
+                )}
             </div>
           </div>
         </div>
@@ -180,8 +296,10 @@ int main() {
         {showAiPanel && (
           <div className="w-[350px] shrink-0 border-l border-border bg-background">
              <AnalysisPanel
+                code={code}
+                user={user}
+                isAnalyzing={isAnalyzing} 
                 aiAnalysis={aiAnalysis}
-                isAnalyzing={isAnalyzing}
              />
           </div>
         )}

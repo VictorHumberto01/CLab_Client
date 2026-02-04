@@ -13,6 +13,13 @@ export default function AccountPage() {
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [selectedItem, setSelectedItem] = useState(null);
+  
+  // Pagination & Search
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
   const router = useRouter();
 
   useEffect(() => {
@@ -21,12 +28,36 @@ export default function AccountPage() {
     }
   }, [user, loading, router]);
 
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        setDebouncedSearch(search);
+        setPage(1); // Reset to page 1 on new search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   useEffect(() => {
     if (user) {
       const fetchHistory = async () => {
+        setLoadingHistory(true);
         try {
-          const res = await api.get('/history');
-          setHistory(res.data || []);
+          const res = await api.get('/history', {
+            params: {
+              page: page,
+              limit: 10,
+              search: debouncedSearch
+            }
+          });
+          
+          if (res.data && res.data.meta) {
+              setHistory(res.data.data || []);
+              setTotalPages(res.data.meta.total_pages || 1);
+          } else {
+             // Fallback for old API response (array)
+             setHistory(Array.isArray(res.data) ? res.data : []);
+             setTotalPages(1);
+          }
         } catch (error) {
           console.error("Failed to fetch history", error);
         } finally {
@@ -35,7 +66,7 @@ export default function AccountPage() {
       };
       fetchHistory();
     }
-  }, [user]);
+  }, [user, page, debouncedSearch]);
 
   if (loading || !user) return null;
 
@@ -105,14 +136,40 @@ export default function AccountPage() {
             ) : history.length === 0 ? (
               <div className="bg-surface border border-border p-8 rounded-lg text-center">
                 <Terminal className="mx-auto text-secondary mb-3" size={32} />
-                <p className="text-secondary text-sm">Nenhum histórico encontrado.</p>
-                <Link href="/" className="text-primary hover:text-primary-hover text-sm mt-2 inline-block">
-                  Começar a codar &rarr;
-                </Link>
+                <p className="text-secondary text-sm">Nenhum histórico encontrado{search ? ` para "${search}"` : ""}.</p>
+                {search && (
+                   <button 
+                      onClick={() => setSearch("")} 
+                      className="text-primary hover:text-primary-hover text-sm mt-2 inline-block"
+                   >
+                     Limpar busca
+                   </button>
+                )}
+                {!search && (
+                   <Link href="/" className="text-primary hover:text-primary-hover text-sm mt-2 inline-block">
+                     Começar a codar &rarr;
+                   </Link>
+                )}
               </div>
             ) : (
-                <div className="bg-surface border border-border rounded-lg overflow-hidden">
-                  <div className="max-h-[400px] overflow-y-auto divide-y divide-border">
+                <div className="bg-surface border border-border rounded-lg overflow-hidden flex flex-col h-[500px]">
+                   {/* Search Bar */}
+                   <div className="p-3 border-b border-border bg-surface-hover flex items-center space-x-2">
+                      <div className="relative flex-1">
+                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Clock size={14} className="text-secondary" />
+                         </div>
+                         <input
+                            type="text"
+                            placeholder="Buscar no histórico..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                             className="w-full bg-background border border-border rounded-md py-1.5 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:border-primary transition-colors"
+                         />
+                      </div>
+                   </div>
+
+                  <div className="flex-1 overflow-y-auto divide-y divide-border min-h-0">
                     {history.map((item, index) => (
                       <div 
                           key={item.ID}
@@ -164,11 +221,29 @@ export default function AccountPage() {
                       </div>
                     ))}
                   </div>
-                  {history.length > 5 && (
-                    <div className="p-2 text-center border-t border-border bg-surface-hover">
-                      <span className="text-xs text-secondary">{history.length} execuções no total</span>
-                    </div>
-                  )}
+                  
+                  {/* Pagination Controls */}
+                  <div className="p-2 border-t border-border bg-surface flex items-center justify-between">
+                     <div className="text-xs text-secondary">
+                        Página {page} de {totalPages || 1}
+                     </div>
+                     <div className="flex space-x-1">
+                        <button 
+                           onClick={() => setPage(p => Math.max(1, p - 1))}
+                           disabled={page === 1}
+                           className="p-1 px-2 rounded hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed text-xs text-foreground font-medium transition-colors"
+                        >
+                           Anterior
+                        </button>
+                         <button 
+                           onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                           disabled={page >= totalPages}
+                           className="p-1 px-2 rounded hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed text-xs text-foreground font-medium transition-colors"
+                        >
+                           Próximo
+                        </button>
+                     </div>
+                  </div>
                 </div>
             )}
           </div>
