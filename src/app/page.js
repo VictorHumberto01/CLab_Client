@@ -24,6 +24,8 @@ int main() {
     return 0;
 }`);
   const [isRunning, setIsRunning] = useState(false);
+  const [exerciseId, setExerciseId] = useState(null);
+  const [exercise, setExercise] = useState(null);
   const [showAiPanel, setShowAiPanel] = useState(true);
   const [showIntro, setShowIntro] = useState(true);
   
@@ -50,7 +52,21 @@ int main() {
         const restoredCode = localStorage.getItem('clab-restore-code');
         if (restoredCode) {
             setCode(restoredCode);
+
             localStorage.removeItem('clab-restore-code');
+        }
+        
+        const storedExerciseId = localStorage.getItem('clab-exercise-id');
+        const storedExerciseTitle = localStorage.getItem('clab-exercise-title');
+        
+        if (storedExerciseId) {
+            setExerciseId(parseInt(storedExerciseId));
+            if (storedExerciseTitle) {
+                setExercise({ id: parseInt(storedExerciseId), title: storedExerciseTitle });
+            }
+        } else {
+            setExerciseId(null);
+            setExercise(null);
         }
     }
   }, []);
@@ -211,8 +227,38 @@ int main() {
         terminalRef.current.term.writeln('\x1b[33m[Compiling and Running...]\x1b[0m');
     }
 
-    // Send code
-    wsRef.current.send(JSON.stringify({ type: "run_code", payload: code }));
+    // Send code with exerciseId = 0 (Regular run)
+    wsRef.current.send(JSON.stringify({ 
+        type: "run_code", 
+        payload: code, 
+        exerciseId: 0 
+    }));
+  };
+
+  const submitInCloud = () => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    if (!exerciseId) return;
+
+    setIsRunning(true);
+    if (terminalRef.current?.term) {
+        terminalRef.current.term.clear();
+        terminalRef.current.term.writeln('\x1b[35m[Submitting for Validation...]\x1b[0m');
+    }
+
+    wsRef.current.send(JSON.stringify({ 
+        type: "run_code", 
+        payload: code, 
+        exerciseId: exerciseId 
+    }));
+  };
+
+  const exitExercise = () => {
+      if (confirm("Deseja sair do exercício? O código atual não será perdido.")) {
+          setExerciseId(null);
+          setExercise(null);
+          localStorage.removeItem('clab-exercise-id');
+          localStorage.removeItem('clab-exercise-title');
+      }
   };
 
   const stopCode = () => {
@@ -229,10 +275,13 @@ int main() {
     <main className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
       <MenuBar 
         runInCloud={runCode}
+        submitInCloud={submitInCloud}
         stopCode={stopCode}
         isRunning={isRunning}
         showAiPanel={showAiPanel}
         setShowAiPanel={setShowAiPanel}
+        exercise={exercise}
+        exitExercise={exitExercise}
       />
       
       <div className="flex flex-1 min-h-0 pt-0 px-0 pb-0 gap-0">
