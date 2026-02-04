@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { FileText } from "lucide-react";
+import { Terminal, Database } from "lucide-react";
 import IntroModal from "../components/IntroModal";
 import MenuBar from "../components/MenuBar";
 import AnalysisPanel from "../components/AIPanel/AnalysisPanel";
+import api from "../utils/api";
 
 // Import Monaco Editor dynamically to avoid SSR issues
 const MonacoEditor = dynamic(
@@ -21,7 +22,7 @@ int main() {
 
     return 0;
 }`);
-  const [input, setInput] = useState("5 10");
+  const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [error, setError] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -29,13 +30,6 @@ int main() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(true);
   const [showIntro, setShowIntro] = useState(true);
-
-  // IntelliSense states
-  const [suggestions, setSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [cursorPosition, setCursorPosition] = useState(0);
-  const [selectedSuggestion, setSelectedSuggestion] = useState(0);
-  const textareaRef = useRef(null);
 
   // Trigger for Monaco Editor resize
   const [resizeTrigger, setResizeTrigger] = useState(0);
@@ -45,8 +39,19 @@ int main() {
     setResizeTrigger(prev => prev + 1);
   }, [showAiPanel]);
 
+  // Restore code from history if available
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+        const restoredCode = localStorage.getItem('clab-restore-code');
+        if (restoredCode) {
+            setCode(restoredCode);
+            localStorage.removeItem('clab-restore-code');
+        }
+    }
+  }, []);
+
   // Run code in cloud server
-  const runInCloud = async () => {
+  const runInCloud = async (overrideInputs = null) => {
     setIsRunning(true);
     setIsAnalyzing(true);
     setOutput("");
@@ -54,25 +59,22 @@ int main() {
     setAiAnalysis(""); // Clear previous analysis
 
     try {
-      // Check if input contains newlines to determine format
-      const hasMultipleLines = input.includes('\n');
+      // Use overrideInputs if provided (though we removed the interactive terminal, keeping arg for flexibility)
+      // Otherwise use the manual input state
+      const inputToUse = typeof overrideInputs === 'string' ? overrideInputs : input;
+
+      const hasMultipleLines = inputToUse && inputToUse.includes('\n');
       const requestBody = {
         code: code,
         ...(hasMultipleLines 
-          ? { inputLines: input.split('\n').filter(line => line.trim()) }
-          : { input: input }
+          ? { inputLines: inputToUse.split('\n').filter(line => line.trim()) }
+          : { input: inputToUse }
         )
       };
 
-      const response = await fetch("http://localhost:8080/compile", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      const result = await response.json();
+      // Use Axios API instance for consistent Auth and Logging
+      const response = await api.post("/compile", requestBody);
+      const result = response.data;
 
       if (result.error) {
         setError(result.error);
@@ -85,64 +87,37 @@ int main() {
         setAiAnalysis(result.analysis);
       }
     } catch (err) {
-      setError(
-        "Failed to connect to compiler service. Make sure your Go API is running on the main server",
-      );
+      console.error("Compile Error:", err);
+      // Construct a more useful error message based on the error type
+      let errorMessage = "Failed to connect to compiler service.";
+      
+      if (err.code === "ERR_NETWORK") {
+         errorMessage += " Server is unreachable (Connection Refused).";
+      } else if (err.response) {
+         errorMessage += ` Server Error (${err.response.status}): ${err.response.data?.error || "Unknown Error"}`;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsRunning(false);
       setIsAnalyzing(false);
     }
   };
 
-  // Apply selected suggestion
-  const applySuggestion = (suggestion) => {
-    if (!suggestion) return;
-
-    const textarea = textareaRef.current;
-    const beforeCursor = code.substring(0, cursorPosition);
-    const afterCursor = code.substring(cursorPosition);
-
-    // Find the start of the current word
-    const wordStart = beforeCursor.search(/[a-zA-Z_#][a-zA-Z0-9_]*$/);
-    const start = wordStart === -1 ? cursorPosition : wordStart;
-
-    let newText;
-    let newCursorPos;
-
-    if (suggestion.type === "function") {
-      newText =
-        beforeCursor.substring(0, start) + suggestion.name + "()" + afterCursor;
-      newCursorPos = start + suggestion.name.length + 1; // Position cursor inside parentheses
-    } else {
-      newText =
-        beforeCursor.substring(0, start) + suggestion.name + afterCursor;
-      newCursorPos = start + suggestion.name.length;
-    }
-
-    setCode(newText);
-    setShowSuggestions(false);
-
-    // Set cursor position
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(newCursorPos, newCursorPos);
-    }, 0);
-  };
-
   return (
-    <main className="flex flex-col h-screen bg-gray-950">
+    <main className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
       <MenuBar 
-        runInCloud={runInCloud}
+        runInCloud={() => runInCloud(null)}
         isRunning={isRunning}
         showAiPanel={showAiPanel}
         setShowAiPanel={setShowAiPanel}
       />
       
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 pt-0 px-0 pb-0 gap-0">
         {/* Main Editor + IO Section */}
-        <div className="flex flex-col flex-1">
+        <div className="flex flex-col flex-1 min-w-0">
           {/* Editor Area */}
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 border-r border-border bg-background">
             <MonacoEditor 
               code={code}
               setCode={setCode}
@@ -152,38 +127,63 @@ int main() {
           </div>
 
           {/* Input/Output Panel */}
-          <div className="h-48 border-t border-gray-800 bg-gray-900/50 backdrop-blur-sm flex">
-            {/* Input Section */}
-            <div className="flex-1 p-4 border-r border-gray-800">
-              <h2 className="text-sm font-medium text-gray-400 mb-2">Input</h2>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                className="w-full h-28 bg-gray-950 text-gray-300 font-mono text-sm p-2 rounded border border-gray-800 resize-none focus:outline-none focus:border-blue-500"
-                placeholder="Program input..."
-              />
-            </div>
+          <div className="h-48 border-t border-border bg-surface relative">
+            <div className="grid grid-cols-2 h-full">
+                {/* Input Section */}
+                <div className="flex flex-col border-r border-border min-h-0">
+                <div className="px-3 py-1.5 border-b border-border flex items-center bg-surface-hover select-none">
+                    <Database size={12} className="mr-2 text-secondary" />
+                    <span className="text-[11px] font-semibold text-secondary uppercase tracking-wide">Entrada</span>
+                </div>
+                <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    className="flex-1 w-full bg-background p-3 text-sm font-mono text-foreground resize-none focus:outline-none placeholder-secondary/50"
+                    placeholder="Entrada padrão (stdin)..."
+                />
+                </div>
 
-            {/* Output Section */}
-            <div className="flex-1 p-4">
-              <h2 className="text-sm font-medium text-gray-400 mb-2">Output</h2>
-              <div className="w-full h-28 bg-gray-950 text-gray-300 font-mono text-sm p-2 rounded border border-gray-800 overflow-auto">
-                {error ? (
-                  <span className="text-red-400">{error}</span>
-                ) : (
-                  output || <span className="text-gray-500">Program output will appear here...</span>
-                )}
-              </div>
+                {/* Output Section */}
+                <div className="flex flex-col min-h-0 relative">
+                <div className="px-3 py-1.5 border-b border-border flex items-center justify-between bg-surface-hover select-none">
+                    <div className="flex items-center">
+                        <Terminal size={12} className="mr-2 text-secondary" />
+                        <span className="text-[11px] font-semibold text-secondary uppercase tracking-wide">Terminal</span>
+                    </div>
+                    {isRunning && (
+                        <span className="text-[10px] text-accent font-mono flex items-center">
+                            <span className="w-1.5 h-1.5 rounded-full bg-accent mr-1.5 animate-pulse"/>
+                            Executando
+                        </span>
+                    )}
+                </div>
+                <div className="flex-1 w-full bg-background p-3 text-sm font-mono overflow-auto">
+                    {error ? (
+                    <div className="text-red-400 whitespace-pre-wrap font-mono relative pl-3">
+                        <span className="absolute left-0 top-1 w-0.5 h-3 bg-red-400" />
+                        {error}
+                    </div>
+                    ) : (
+                    output ? (
+                        <div className="text-foreground whitespace-pre-wrap">{output}</div>
+                    ) : (
+                        <span className="text-secondary italic">Sem saída.</span>
+                    )
+                    )}
+                </div>
+                </div>
             </div>
           </div>
         </div>
 
         {/* AI Analysis Panel */}
         {showAiPanel && (
-          <AnalysisPanel
-            aiAnalysis={aiAnalysis}
-            isAnalyzing={isAnalyzing}
-          />
+          <div className="w-[350px] shrink-0 border-l border-border bg-background">
+             <AnalysisPanel
+                aiAnalysis={aiAnalysis}
+                isAnalyzing={isAnalyzing}
+             />
+          </div>
         )}
       </div>
 

@@ -1,17 +1,25 @@
 import { useRef, useEffect, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
+import { useTheme } from '../../context/ThemeContext';
 
 const MonacoEditor = ({ code, setCode, language = 'c', triggerResize }) => {
   const editorRef = useRef(null);
+  const monacoRef = useRef(null);
   const containerRef = useRef(null);
+  const { currentTheme } = useTheme();
 
   const handleEditorDidMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
+
+    // Iterate on theme application
+    applyMonacoTheme(monaco, currentTheme);
 
     // Configure editor with better settings for cursor positioning
     editor.updateOptions({
       fontSize: 14,
-      fontFamily: 'Geist Mono, Consolas, "Courier New", monospace',
+      fontFamily: "'JetBrains Mono', 'Menlo', 'Consolas', monospace",
+      fontLigatures: true,
       minimap: {
         enabled: false
       },
@@ -44,7 +52,50 @@ const MonacoEditor = ({ code, setCode, language = 'c', triggerResize }) => {
         editorRef.current.focus();
       }
     }, 100);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Helper to define and set theme
+  const applyMonacoTheme = (monaco, theme) => {
+    if (!monaco) return;
+
+    if (theme.monacoTheme && ['vs', 'vs-dark', 'hc-black'].includes(theme.monacoTheme)) {
+        monaco.editor.setTheme(theme.monacoTheme);
+    } else {
+        // Define Custom Theme
+        const isDark = theme.id !== 'latte'; // Simple heuristic, or check background brightness
+        const base = isDark ? 'vs-dark' : 'vs';
+
+        monaco.editor.defineTheme('custom-theme', {
+            base: base,
+            inherit: true,
+            rules: [
+                { token: '', foreground: theme.colors.foreground },
+                { token: 'keyword', foreground: theme.colors.primary },
+                { token: 'comment', foreground: theme.colors.secondary, fontStyle: 'italic' },
+                { token: 'string', foreground: theme.colors.accent },
+                { token: 'number', foreground: theme.colors.accent },
+                { token: 'delimiter', foreground: theme.colors.foreground },
+            ],
+            colors: {
+                'editor.background': theme.colors.background,
+                'editor.foreground': theme.colors.foreground,
+                'editorCursor.foreground': theme.colors.primary,
+                'editor.lineHighlightBackground': theme.colors.surfaceHover,
+                'editorLineNumber.foreground': theme.colors.secondary,
+                'editor.selectionBackground': theme.colors.primary + '40', // 25% opacity
+                'editor.inactiveSelectionBackground': theme.colors.primary + '20',
+            }
+        });
+        monaco.editor.setTheme('custom-theme');
+    }
+  };
+
+  // React to theme changes
+  useEffect(() => {
+    if (monacoRef.current && currentTheme) {
+        applyMonacoTheme(monacoRef.current, currentTheme);
+    }
+  }, [currentTheme]);
 
   // Handle triggerResize prop changes
   useEffect(() => {
@@ -123,16 +174,27 @@ const MonacoEditor = ({ code, setCode, language = 'c', triggerResize }) => {
         value={code}
         onChange={setCode}
         onMount={handleEditorDidMount}
-        theme="vs-dark"
+        // theme prop is handled manually by applyMonacoTheme
         loading={
-          <div className="flex items-center justify-center h-full text-gray-400">
-            Loading editor...
+          <div className="flex items-center justify-center h-full text-secondary">
+            Carregando editor...
           </div>
         }
         options={{
           automaticLayout: true,
           fontSize: 14,
-          fontFamily: 'Geist Mono, Consolas, "Courier New", monospace',
+          fontFamily: "'JetBrains Mono', 'Menlo', 'Consolas', monospace",
+          fontLigatures: true,
+          renderWhitespace: 'selection',
+          cursorBlinking: 'smooth',
+          cursorSmoothCaretAnimation: 'on',
+          smoothScrolling: true,
+          contextmenu: true,
+          mouseWheelZoom: false,
+          
+          // Professional feel:
+          lineNumbersMinChars: 4,
+          ruler: 80,
           minimap: { enabled: false },
           scrollBeyondLastLine: false
         }}
