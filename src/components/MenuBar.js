@@ -66,9 +66,7 @@ const MenuBar = ({ runInCloud, isRunning, showAiPanel, setShowAiPanel }) => {
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
                 className="flex items-center space-x-2 py-1 px-2 rounded-md hover:bg-surface-hover transition-all text-xs text-foreground"
              >
-                <div className="w-5 h-5 rounded bg-primary flex items-center justify-center text-[10px] font-bold text-white">
-                    {user.email?.[0].toUpperCase()}
-                </div>
+                <User size={18} className="text-primary" />
                 <span className="max-w-[100px] truncate">{user.email}</span>
                 <ChevronDown size={12} className="text-secondary" />
              </button>

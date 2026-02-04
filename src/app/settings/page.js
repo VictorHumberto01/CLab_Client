@@ -1,99 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
-import MenuBar from "../../components/MenuBar";
 import { useTheme } from "../../context/ThemeContext";
-import { Check, Trash2, Plus, ArrowLeft, Upload } from "lucide-react";
+import { Check, Trash2, Plus, ArrowLeft, Upload, Palette, Server, Info, Code, Terminal, Cpu, Database, Monitor } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 const SettingsPage = () => {
   const { currentTheme, availableThemes, changeTheme, addCustomTheme, removeCustomTheme } = useTheme();
   const [jsonInput, setJsonInput] = useState("");
   const [error, setError] = useState("");
-  const router = useRouter();
+  const [activeSection, setActiveSection] = useState("appearance");
+  const [saveMessage, setSaveMessage] = useState("");
 
-  const handleImport = (jsonStr) => {
-    try {
-      const theme = JSON.parse(jsonStr);
-      
-      // Basic Validation
-      if (!theme.name || !theme.colors) {
-          throw new Error("Invalid theme format. Missing 'name' or 'colors'.");
-      }
-      if (!theme.id) {
-          theme.id = theme.name.toLowerCase().replace(/\s+/g, '-');
-      }
-      
-      // Check for required colors
-      const requiredColors = ['background', 'foreground', 'surface', 'surfaceHover', 'border', 'primary', 'primaryHover', 'secondary', 'accent'];
-      const missing = requiredColors.filter(c => !theme.colors[c]);
-      if (missing.length > 0) {
-          throw new Error(`Missing colors: ${missing.join(', ')}`);
-      }
-
-      addCustomTheme(theme);
-      setJsonInput("");
-      setError("");
-      alert("Theme added successfully!");
-    } catch (e) {
-      setError(e.message);
-    }
-  };
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        handleImport(event.target.result);
-    };
-    reader.readAsText(file);
-    // Reset input so same file can be selected again
-    e.target.value = '';
-  };
-
-  const ThemeCard = ({ theme }) => (
-    <div 
-        onClick={() => changeTheme(theme.id)}
-        className={`
-            relative p-4 rounded-lg border cursor-pointer transition-all group
-            ${currentTheme.id === theme.id 
-                ? 'border-primary bg-primary/5 ring-1 ring-primary' 
-                : 'border-border bg-surface hover:border-gray-500'
-            }
-        `}
-    >
-        <div className="flex justify-between items-start mb-3">
-            <span className="font-medium text-sm text-gray-200">{theme.name}</span>
-            {currentTheme.id === theme.id && <Check size={16} className="text-primary" />}
-        </div>
-        
-        {/* Color Preview Swatches */}
-        <div className="flex space-x-2">
-            <div className="w-6 h-6 rounded-full ring-1 ring-white/10" style={{ backgroundColor: theme.colors.background }} title="Background" />
-            <div className="w-6 h-6 rounded-full ring-1 ring-white/10" style={{ backgroundColor: theme.colors.surface }} title="Surface" />
-            <div className="w-6 h-6 rounded-full ring-1 ring-white/10" style={{ backgroundColor: theme.colors.primary }} title="Primary" />
-            <div className="w-6 h-6 rounded-full ring-1 ring-white/10" style={{ backgroundColor: theme.colors.accent }} title="Accent" />
-        </div>
-
-        {/* Delete Button (only for custom themes) */}
-        {!['zinc', 'dracula', 'monokai', 'latte'].includes(theme.id) && (
-            <button 
-                onClick={(e) => {
-                    e.stopPropagation();
-                    if(confirm(`Delete theme "${theme.name}"?`)) removeCustomTheme(theme.id);
-                }}
-                className="absolute top-2 right-2 p-1.5 text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 rounded transition-all"
-            >
-                <Trash2 size={14} />
-            </button>
-        )}
-    </div>
-  );
-
-  // Load Server IP 
   const [serverIp, setServerIp] = useState("http://localhost:8080");
 
   React.useEffect(() => {
@@ -105,118 +23,279 @@ const SettingsPage = () => {
 
   const handleSaveIp = () => {
     localStorage.setItem('clab-server-ip', serverIp);
-    alert("IP do servidor salvo! Recarregue a página para aplicar.");
-    window.location.reload();
+    setSaveMessage("// salvo");
+    setTimeout(() => setSaveMessage(""), 3000);
   };
 
-  return (
-    <main className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
-      {/* We reuse MenuBar, but maybe disable 'Run' since we are in settings? Or just keep it consistency */}
-      {/* Actually simpler to just have a header for settings since we are 'navigating away' from IDE context conceptually */}
-      <div className="h-10 border-b border-border bg-surface flex items-center px-3 select-none app-drag">
-           <Link href="/" className="flex items-center text-secondary hover:text-foreground transition-colors no-drag">
-               <ArrowLeft size={16} className="mr-2" />
-               <span className="text-sm font-medium">Voltar ao Editor</span>
-           </Link>
-           <div className="mx-auto font-semibold text-sm text-foreground">Configurações</div>
-      </div>
+  const handleImport = (jsonStr, silent = false) => {
+    try {
+      const theme = JSON.parse(jsonStr);
+      if (!theme.name || !theme.colors) throw new Error("Faltando 'name' ou 'colors'");
+      if (!theme.id) theme.id = theme.name.toLowerCase().replace(/\s+/g, '-');
+      
+      const requiredColors = ['background', 'foreground', 'surface', 'surfaceHover', 'border', 'primary', 'primaryHover', 'secondary', 'accent'];
+      const missing = requiredColors.filter(c => !theme.colors[c]);
+      if (missing.length > 0) throw new Error(`Faltando: ${missing.join(', ')}`);
 
-      <div className="flex-1 overflow-auto p-8 max-w-4xl mx-auto w-full">
-          <h1 className="text-2xl font-bold mb-6 text-foreground">Aparência</h1>
-          
-          <section className="mb-10">
-              <h2 className="text-lg font-medium mb-4 text-foreground/80">Selecionar Tema</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {availableThemes.map(t => <ThemeCard key={t.id} theme={t} />)}
-              </div>
-          </section>
+      addCustomTheme(theme);
+      if (!silent) {
+        setJsonInput("");
+        setError("");
+      }
+    } catch (e) {
+      if (!silent) setError(e.message);
+    }
+  };
 
-          <section className="mb-10 pt-8 border-t border-border">
-              <h2 className="text-lg font-medium mb-4 text-foreground/80">Criar Tema Personalizado</h2>
-              <div className="bg-surface border border-border rounded-lg p-6">
-                  <p className="text-sm text-secondary mb-4">
-                      Cole um JSON de configuração abaixo para adicionar um novo tema. 
-                      Deve incluir <code>id</code>, <code>name</code>, e objeto <code>colors</code>.
-                  </p>
-                  
-                  <textarea
-                    value={jsonInput}
-                    onChange={(e) => setJsonInput(e.target.value)}
-                    className="w-full h-48 bg-background border border-border rounded-md p-4 font-mono text-sm text-foreground focus:border-primary focus:outline-none mb-4"
-                    placeholder={`{
-  "id": "ocean-blue",
-  "name": "Ocean Blue",
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    
+    let importedCount = 0;
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        handleImport(event.target.result, true);
+        importedCount++;
+        if (importedCount === files.length && files.length > 1) {
+          setError(null);
+        }
+      };
+      reader.readAsText(file);
+    });
+    e.target.value = '';
+  };
+
+  const themeTemplate = `{
+  "name": "Meu Tema",
   "colors": {
-    "background": "#0f172a",
-    "foreground": "#e2e8f0",
-    "surface": "#1e293b",
-    "surfaceHover": "#334155",
-    "border": "#334155",
-    "primary": "#38bdf8",
-    "primaryHover": "#0ea5e9",
-    "secondary": "#94a3b8",
-    "accent": "#4ade80"
+    "background": "#1a1b26",
+    "foreground": "#c0caf5",
+    "surface": "#24283b",
+    "surfaceHover": "#414868",
+    "border": "#414868",
+    "primary": "#7aa2f7",
+    "primaryHover": "#5d7fc7",
+    "secondary": "#565f89",
+    "accent": "#9ece6a"
   }
-}`}
-                  />
-                  
-                  {error && (
-                      <div className="p-3 mb-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded">
-                          {error}
-                      </div>
-                  )}
+}`;
 
-                  <div className="flex gap-4">
+  const ThemeCard = ({ theme }) => (
+    <div 
+      onClick={() => changeTheme(theme.id)}
+      className={`relative p-2.5 rounded border cursor-pointer transition-all group ${
+        currentTheme.id === theme.id 
+          ? 'border-primary bg-primary/5' 
+          : 'border-border bg-background hover:border-secondary'
+      }`}
+    >
+      <div className="flex justify-between items-center mb-2">
+        <code className="text-xs text-foreground">{theme.name}</code>
+        {currentTheme.id === theme.id && <Check size={12} className="text-primary" />}
+      </div>
+      <div className="flex space-x-1">
+        {[theme.colors.background, theme.colors.surface, theme.colors.primary, theme.colors.accent].map((c, i) => (
+          <div key={i} className="w-4 h-4 rounded-sm border border-border" style={{ backgroundColor: c }} />
+        ))}
+      </div>
+      {!['zinc', 'dracula', 'monokai', 'latte'].includes(theme.id) && (
+        <button 
+          onClick={(e) => { e.stopPropagation(); if(confirm(`Excluir ${theme.name}?`)) removeCustomTheme(theme.id); }}
+          className="absolute top-1.5 right-1.5 p-0.5 text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 rounded transition-all"
+        >
+          <Trash2 size={10} />
+        </button>
+      )}
+    </div>
+  );
+
+  const navItems = [
+    { id: 'appearance', label: 'tema', icon: Palette },
+    { id: 'connection', label: 'rede', icon: Server },
+    { id: 'about', label: 'sobre', icon: Terminal },
+  ];
+
+  return (
+    <main className="flex flex-col h-screen bg-background text-foreground overflow-hidden font-mono">
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar */}
+        <div className="w-44 border-r border-border bg-surface flex flex-col">
+          {/* Header */}
+          <div className="p-3 pt-[50px] border-b border-border">
+            <code className="text-xs text-secondary">~/configurações</code>
+          </div>
+
+          {/* Navigation */}
+          <nav className="p-2 flex flex-col space-y-0.5 flex-1">
+            {navItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setActiveSection(item.id)}
+                className={`flex items-center px-2 py-1.5 rounded text-xs transition-colors ${
+                  activeSection === item.id 
+                    ? 'bg-primary/10 text-primary' 
+                    : 'text-secondary hover:text-foreground hover:bg-surface-hover'
+                }`}
+              >
+                <item.icon size={12} className="mr-2" />
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
+          {/* Back Button - Bottom */}
+          <div className="p-3 border-t border-border">
+            <Link 
+              href="/" 
+              className="flex items-center text-secondary hover:text-primary transition-colors text-xs"
+            >
+              <ArrowLeft size={12} className="mr-1.5" />
+              <span>voltar</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          <div className="max-w-xl">
+
+            {activeSection === 'appearance' && (
+              <div className="space-y-6">
+                <div className="flex items-center space-x-2 text-secondary text-xs">
+                  <span className="text-primary">$</span>
+                  <span>ver temas</span>
+                </div>
+
+                <section>
+                  <div className="text-[10px] text-secondary uppercase tracking-widest mb-2">// temas disponíveis</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {availableThemes.map(t => <ThemeCard key={t.id} theme={t} />)}
+                  </div>
+                </section>
+
+                <section className="pt-4 border-t border-border">
+                  <div className="text-[10px] text-secondary uppercase tracking-widest mb-2">// importar tema</div>
+                  <div className="bg-background border border-border rounded p-3">
+                    <textarea
+                      value={jsonInput}
+                      onChange={(e) => setJsonInput(e.target.value)}
+                      className="w-full h-40 bg-transparent text-xs text-foreground focus:outline-none resize-none"
+                      placeholder={themeTemplate}
+                      spellCheck={false}
+                    />
+                    {error && <div className="text-red-400 text-[10px] mt-2">// erro: {error}</div>}
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-border">
                       <button 
                         onClick={() => handleImport(jsonInput)}
                         disabled={!jsonInput.trim()}
-                        className="flex-1 flex items-center justify-center px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 flex items-center justify-center px-2 py-1 bg-primary hover:bg-primary-hover text-white rounded text-[10px] transition-colors disabled:opacity-40"
                       >
-                          <Plus size={16} className="mr-2" />
-                          Adicionar Texto
+                        <Plus size={10} className="mr-1" /> adicionar
                       </button>
-                      
                       <div className="flex-1 relative">
-                          <input 
-                            type="file" 
-                            accept=".json"
-                            onChange={handleFileUpload}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          />
-                          <button 
-                            className="w-full h-full flex items-center justify-center px-4 py-2 bg-surface hover:bg-surface-hover border border-border text-secondary rounded-md text-sm font-medium transition-colors"
-                          >
-                              <Upload size={16} className="mr-2" />
-                              Importar JSON
-                          </button>
+                        <input type="file" accept=".json" multiple onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                        <button className="w-full flex items-center justify-center px-2 py-1 border border-border text-secondary rounded text-[10px] hover:text-foreground">
+                          <Upload size={10} className="mr-1" /> importar
+                        </button>
                       </div>
+                    </div>
                   </div>
+                </section>
               </div>
-          </section>
+            )}
 
-          <section className="mb-10 pt-8 border-t border-border">
-            <h1 className="text-2xl font-bold mb-6 text-foreground">Conexão</h1>
-            <h2 className="text-lg font-medium mb-4 text-foreground/80">Endereço do Servidor</h2>
-            <div className="bg-surface border border-border rounded-lg p-6">
-                 <p className="text-sm text-secondary mb-4">
-                    Defina o IP ou URL do servidor backend. Padrão: <code>http://localhost:8080</code>
-                  </p>
-                  <div className="flex gap-4">
-                    <input 
+            {activeSection === 'connection' && (
+              <div className="space-y-6">
+                <div className="flex items-center space-x-2 text-secondary text-xs">
+                  <span className="text-primary">$</span>
+                  <span>testar conexão</span>
+                </div>
+
+                <section>
+                  <div className="text-[10px] text-secondary uppercase tracking-widest mb-2">// servidor backend</div>
+                  <div className="bg-background border border-border rounded p-3">
+                    <div className="text-[10px] text-secondary mb-2">BASE_URL =</div>
+                    <div className="flex gap-2">
+                      <input 
                         type="text" 
                         value={serverIp}
                         onChange={(e) => setServerIp(e.target.value)}
-                        className="flex-1 bg-background border border-border rounded-md px-4 py-2 text-foreground focus:border-primary focus:outline-none"
-                    />
-                    <button 
+                        className="flex-1 bg-transparent border-b border-border px-1 py-1 text-xs text-foreground focus:border-primary focus:outline-none"
+                      />
+                      <button 
                         onClick={handleSaveIp}
-                        className="px-6 py-2 bg-primary hover:bg-primary-hover text-white rounded-md text-sm font-medium transition-colors"
-                    >
-                        Salvar
-                    </button>
+                        className="px-3 py-1 bg-primary hover:bg-primary-hover text-white rounded text-[10px] transition-colors"
+                      >
+                        salvar
+                      </button>
+                    </div>
+                    {saveMessage && <div className="text-green-400 text-[10px] mt-2">{saveMessage}</div>}
                   </div>
-            </div>
-          </section>
+                </section>
+              </div>
+            )}
+
+            {activeSection === 'about' && (
+              <div className="space-y-6">
+                <div className="flex items-center space-x-2 text-secondary text-xs">
+                  <span className="text-primary">$</span>
+                  <span>neofetch</span>
+                </div>
+
+                <div className="bg-background border border-border rounded p-4">
+                  <div className="flex items-start space-x-4">
+                    {/* ASCII Art Logo */}
+                    <pre className="text-primary text-[8px] leading-tight hidden sm:block">{`
+   _____ _       _     
+  / ____| |     | |    
+ | |    | | __ _| |__  
+ | |    | |/ _\` | '_ \\ 
+ | |____| | (_| | |_) |
+  \\_____|_|\\__,_|_.__/ 
+                       `}</pre>
+                    
+                    {/* Info */}
+                    <div className="text-xs space-y-1 flex-1">
+                      <div className="flex">
+                        <span className="text-primary w-20">app</span>
+                        <span className="text-foreground">CLab IDE</span>
+                      </div>
+                      <div className="flex">
+                        <span className="text-primary w-20">version</span>
+                        <span className="text-foreground">0.1.0-alpha</span>
+                      </div>
+                      <div className="border-t border-border my-2" />
+                      <div className="flex">
+                        <span className="text-secondary w-20">frontend</span>
+                        <span className="text-foreground">Next.js 14</span>
+                      </div>
+                      <div className="flex">
+                        <span className="text-secondary w-20">backend</span>
+                        <span className="text-foreground">Go + Gin</span>
+                      </div>
+                      <div className="flex">
+                        <span className="text-secondary w-20">editor</span>
+                        <span className="text-foreground">Monaco</span>
+                      </div>
+                      <div className="flex">
+                        <span className="text-secondary w-20">runtime</span>
+                        <span className="text-foreground">Electron</span>
+                      </div>
+                      <div className="border-t border-border my-2" />
+                      <div className="flex space-x-1">
+                        {['bg-red-500', 'bg-yellow-500', 'bg-green-500', 'bg-cyan-500', 'bg-blue-500', 'bg-purple-500'].map((c, i) => (
+                          <div key={i} className={`w-3 h-3 rounded-sm ${c}`} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
       </div>
     </main>
   );

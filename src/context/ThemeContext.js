@@ -40,9 +40,15 @@ export const ThemeProvider = ({ children }) => {
   };
 
   const addCustomTheme = (newTheme) => {
-    const updatedCustom = [...customThemes, newTheme];
-    setCustomThemes(updatedCustom);
-    localStorage.setItem('clab-custom-themes', JSON.stringify(updatedCustom));
+    setCustomThemes(prev => {
+      // Check if theme already exists
+      if (prev.some(t => t.id === newTheme.id)) {
+        return prev;
+      }
+      const updatedCustom = [...prev, newTheme];
+      localStorage.setItem('clab-custom-themes', JSON.stringify(updatedCustom));
+      return updatedCustom;
+    });
     // Automatically switch to it
     changeTheme(newTheme.id);
   };

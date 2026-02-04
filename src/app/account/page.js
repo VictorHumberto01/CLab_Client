@@ -6,12 +6,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '../../utils/api';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Clock, Code, Terminal, Calendar } from 'lucide-react';
+import { ArrowLeft, Clock, Code, Terminal, Calendar, User, ChevronRight } from 'lucide-react';
 
 export default function AccountPage() {
   const { user, loading, logout } = useAuth();
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [selectedItem, setSelectedItem] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -37,8 +38,6 @@ export default function AccountPage() {
   }, [user]);
 
   if (loading || !user) return null;
-
-  const [selectedItem, setSelectedItem] = useState(null);
 
   const handleRestore = (code) => {
     // Save to localStorage so the main page can pick it up (we'll need to update page.js to check this)
@@ -75,8 +74,8 @@ export default function AccountPage() {
           {/* Profile Card */}
           <div className="bg-surface border border-border p-5 rounded-lg col-span-1 h-fit">
             <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-primary rounded flex items-center justify-center text-lg font-bold text-white mr-3">
-                {user.email?.[0].toUpperCase()}
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mr-3">
+                  <User size={22} className="text-primary" />
                 </div>
                 <div>
                     <h2 className="text-sm font-bold text-foreground">Minha Conta</h2>
@@ -90,10 +89,6 @@ export default function AccountPage() {
                 <span className="text-xs font-mono px-1.5 py-0.5 bg-primary/10 text-primary rounded">
                   Estudante
                 </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-secondary">Entrou em</span>
-                <span className="text-foreground">Fev 2026</span>
               </div>
             </div>
           </div>
@@ -116,30 +111,64 @@ export default function AccountPage() {
                 </Link>
               </div>
             ) : (
-                <div className="space-y-2">
-                  {history.map((item) => (
-                    <div 
-                        key={item.ID}
-                        onClick={() => setSelectedItem(item)}
-                        className="bg-surface border border-border hover:border-primary/50 p-3 rounded hover:bg-surface-hover transition-colors group cursor-pointer flex items-center justify-between"
-                    >
-                        <div className="flex items-center space-x-3 overflow-hidden">
-                             <span className={`flex-shrink-0 w-2 h-2 rounded-full ${!item.Error ? 'bg-green-500' : 'bg-red-500'}`} />
-                             <div className="flex flex-col min-w-0">
-                                <span className="font-mono text-xs text-foreground truncate max-w-[300px]">
-                                    {item.Code?.substring(0, 40)}...
-                                </span>
-                                <span className="text-[10px] text-secondary flex items-center mt-1">
-                                    <Calendar size={10} className="mr-1" />
-                                    {new Date(item.CreatedAt).toLocaleDateString()}
-                                </span>
-                             </div>
-                        </div>
-                        <div className="text-xs text-secondary font-mono truncate max-w-[150px] hidden sm:block">
-                            {item.Output ? `> ${item.Output.substring(0, 20)}` : ''}
-                        </div>
+                <div className="bg-surface border border-border rounded-lg overflow-hidden">
+                  <div className="max-h-[400px] overflow-y-auto divide-y divide-border">
+                    {history.map((item, index) => (
+                      <div 
+                          key={item.ID}
+                          onClick={() => setSelectedItem(item)}
+                          className="p-3 hover:bg-surface-hover transition-colors cursor-pointer flex items-center justify-between group"
+                      >
+                          <div className="flex items-center space-x-3 overflow-hidden flex-1 min-w-0">
+                               <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-surface-hover group-hover:bg-background transition-colors">
+                                 <span className={`w-2.5 h-2.5 rounded-full ${!item.Error ? 'bg-green-500' : 'bg-red-500'}`} />
+                               </div>
+                               <div className="flex flex-col min-w-0 flex-1">
+                                  <code className="text-xs text-foreground truncate block">
+                                      {(() => {
+                                        const lines = item.Code?.split('\n') || [];
+                                        const meaningfulLines = lines
+                                          .filter(line => 
+                                            line.trim() && 
+                                            !line.trim().startsWith('#include') && 
+                                            !line.trim().startsWith('//')
+                                          )
+                                          .map(line => line.trim())
+                                          .join(' ');
+                                        const preview = meaningfulLines.substring(0, 60);
+                                        return preview.length < meaningfulLines.length ? preview + '...' : preview || 'Código';
+                                      })()}
+                                  </code>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-[10px] text-secondary flex items-center">
+                                        <Calendar size={10} className="mr-1" />
+                                        {new Date(item.CreatedAt).toLocaleDateString('pt-BR', {
+                                          day: '2-digit',
+                                          month: 'short',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                    </span>
+                                    {!item.Error && item.Output && (
+                                      <span className="text-[10px] text-green-500 font-medium">✓ Sucesso</span>
+                                    )}
+                                    {item.Error && (
+                                      <span className="text-[10px] text-red-500 font-medium">✗ Erro</span>
+                                    )}
+                                  </div>
+                               </div>
+                          </div>
+                          <div className="text-secondary group-hover:text-primary transition-colors ml-2">
+                            <ChevronRight size={16} />
+                          </div>
+                      </div>
+                    ))}
+                  </div>
+                  {history.length > 5 && (
+                    <div className="p-2 text-center border-t border-border bg-surface-hover">
+                      <span className="text-xs text-secondary">{history.length} execuções no total</span>
                     </div>
-                  ))}
+                  )}
                 </div>
             )}
           </div>
