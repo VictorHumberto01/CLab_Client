@@ -10,7 +10,7 @@ export const DEFAULT_THEMES = [
       border: '#27272a',
       primary: '#3b82f6',
       primaryHover: '#2563eb',
-      secondary: '#71717a',
+      secondary: '#a1a1aa', // Zinc 400 (Lightened for better contrast)
       accent: '#22c55e'
     },
     monacoTheme: 'vs-dark' 
@@ -26,7 +26,7 @@ export const DEFAULT_THEMES = [
       border: '#6272a4',
       primary: '#bd93f9',
       primaryHover: '#ff79c6',
-      secondary: '#6272a4',
+      secondary: '#8b9bb4', // Lighter Blue-Gray
       accent: '#50fa7b'
     },
     monacoTheme: 'dracula' 
@@ -42,7 +42,7 @@ export const DEFAULT_THEMES = [
       border: '#5B595C',
       primary: '#FFD866',
       primaryHover: '#FFD866',
-      secondary: '#727072',
+      secondary: '#939293', // Lighter Gray
       accent: '#A9DC76'
     },
     monacoTheme: 'monokai'
@@ -58,7 +58,7 @@ export const DEFAULT_THEMES = [
       border: '#bcc0cc',
       primary: '#1e66f5',
       primaryHover: '#179299',
-      secondary: '#9ca0b0',
+      secondary: '#6c6f85', // Darker Text for Light Mode
       accent: '#40a02b'
     },
     monacoTheme: 'vs-light'

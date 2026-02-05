@@ -178,12 +178,12 @@ export default function AccountPage() {
                       >
                           <div className="flex items-center space-x-3 overflow-hidden flex-1 min-w-0">
                                <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-surface-hover group-hover:bg-background transition-colors">
-                                 <span className={`w-2.5 h-2.5 rounded-full ${!item.Error ? 'bg-green-500' : 'bg-red-500'}`} />
+                                 <span className={`w-2.5 h-2.5 rounded-full ${!item.error ? 'bg-green-500' : 'bg-red-500'}`} />
                                </div>
                                <div className="flex flex-col min-w-0 flex-1">
                                   <code className="text-xs text-foreground truncate block">
                                       {(() => {
-                                        const lines = item.Code?.split('\n') || [];
+                                        const lines = item.code?.split('\n') || [];
                                         const meaningfulLines = lines
                                           .filter(line => 
                                             line.trim() && 
@@ -206,10 +206,10 @@ export default function AccountPage() {
                                           minute: '2-digit'
                                         })}
                                     </span>
-                                    {!item.Error && item.Output && (
+                                    {!item.error && item.output && (
                                       <span className="text-[10px] text-green-500 font-medium">✓ Sucesso</span>
                                     )}
-                                    {item.Error && (
+                                    {item.error && (
                                       <span className="text-[10px] text-red-500 font-medium">✗ Erro</span>
                                     )}
                                   </div>
@@ -262,7 +262,7 @@ export default function AccountPage() {
                         <h3 className="font-semibold text-foreground text-sm">Detalhes da Execução</h3>
                         <div className="flex space-x-2">
                             <button 
-                                onClick={() => handleRestore(selectedItem.Code)}
+                                onClick={() => handleRestore(selectedItem.code)}
                                 className="px-3 py-1 bg-primary/10 hover:bg-primary/20 text-primary text-xs rounded transition-colors flex items-center"
                             >
                                 <Code size={14} className="mr-1.5" />
@@ -279,25 +279,25 @@ export default function AccountPage() {
                         <div className="p-4 border-b border-border">
                             <div className="text-secondary mb-2 uppercase tracking-wide font-bold text-[10px]">Código Fonte</div>
                             <pre className="bg-background p-3 rounded text-foreground overflow-x-auto border border-border">
-                                <code>{selectedItem.Code}</code>
+                                <code>{selectedItem.code}</code>
                             </pre>
                         </div>
 
                         <div className="grid grid-cols-2 divide-x divide-border border-b border-border">
                             <div className="p-4">
                                 <div className="text-secondary mb-2 uppercase tracking-wide font-bold text-[10px]">Entrada (Stdin)</div>
-                                <pre className="text-foreground whitespace-pre-wrap">{selectedItem.Input || "—"}</pre>
+                                <pre className="text-foreground whitespace-pre-wrap">{selectedItem.input || "—"}</pre>
                             </div>
                             <div className="p-4">
                                 <div className="text-secondary mb-2 uppercase tracking-wide font-bold text-[10px]">Saída (Stdout)</div>
-                                <pre className="text-foreground whitespace-pre-wrap">{selectedItem.Output || "—"}</pre>
+                                <pre className="text-foreground whitespace-pre-wrap">{selectedItem.output || "—"}</pre>
                             </div>
                         </div>
 
-                        {selectedItem.Error && (
+                        {selectedItem.error && (
                             <div className="p-4 bg-red-500/5">
                                 <div className="text-red-500 mb-2 uppercase tracking-wide font-bold text-[10px]">Log de Erro</div>
-                                <pre className="text-red-400 whitespace-pre-wrap">{selectedItem.Error}</pre>
+                                <pre className="text-red-400 whitespace-pre-wrap">{selectedItem.error}</pre>
                             </div>
                         )}
                     </div>

@@ -40,7 +40,7 @@ const MenuBar = ({ runInCloud, stopCode, isRunning, showAiPanel, setShowAiPanel,
             </div>
             <button 
                 onClick={exitExercise}
-                className="flex items-center space-x-1 px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded text-xs font-medium transition-colors ml-2"
+                className="flex items-center space-x-1 px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded text-xs font-medium transition-colors ml-2 no-drag"
                 title="Sair do exercício atual"
             >
                 <LogOut size={12} className="mr-1" />
