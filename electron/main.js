@@ -5,6 +5,7 @@ const serve = require('electron-serve');
 const loadURL = serve({ directory: 'out' });
 
 let mainWindow;
+const isMac = process.platform === 'darwin';
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -15,7 +16,15 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
-    titleBarStyle: 'hiddenInset',
+    // macOS: use hiddenInset for native traffic lights
+    // Windows/Linux: use frameless window
+    titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
+    frame: isMac, // macOS uses frame with hidden title bar, Windows needs frameless
+    titleBarOverlay: !isMac ? {
+      color: '#0a0a0b',
+      symbolColor: '#ffffff',
+      height: 40
+    } : false,
     backgroundColor: '#0a0a0b',
   });
 

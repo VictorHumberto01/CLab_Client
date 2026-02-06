@@ -12,7 +12,10 @@ import {
   CheckCircle,
   XCircle,
   Play,
-  ChevronDown
+  ChevronDown,
+  Clock,
+  Lock,
+  Shield
 } from "lucide-react";
 
 export default function StudentDashboard() {
@@ -34,12 +37,8 @@ export default function StudentDashboard() {
   const fetchClassrooms = async () => {
     setLoadingData(true);
     try {
-      const res = await api.get('/classrooms'); // Assuming this returns classrooms the student is in? 
-      // Actually, ListClassrooms on backend currently returns ALL classrooms or just teacher's?
-      // Start with listing all, or need a backend endpoint generic enough. 
-      // The current backend ListClassrooms filters by TeacherID if user is teacher.
-      // If student, does it return all? 
-      // Let's assume for now the backend might need a tweak or it returns all public.
+      const res = await api.get('/classrooms');
+
       if (res.data.success) {
         setClassrooms(res.data.data || []);
       }
@@ -74,17 +73,38 @@ export default function StudentDashboard() {
     }
   }, [selectedClassroom]);
 
-  const handleSolveExercise = (ex) => {
+  // Auto-expand exam topic if active
+  useEffect(() => {
+      if (selectedClassroom?.activeExamId && topics.length > 0) {
+          const examTopic = topics.find(t => t.id === selectedClassroom.activeExamId);
+          if (examTopic) {
+              setExpandedTopic(examTopic.id);
+          }
+      }
+  }, [selectedClassroom, topics]);
+
+  const handleSolveExercise = (ex, topic) => {
       // Save context and redirect to IDE
       if (typeof window !== 'undefined') {
           // Store the exercise details
-          localStorage.setItem('clab-exercise-id', ex.id.toString());
           localStorage.setItem('clab-exercise-title', ex.title);
           localStorage.setItem('clab-exercise-description', ex.description || "");
           
-          // Store the initial code for this exercise as a fallback/target
-          // We do NOT overwrite 'clab-restore-code' (which is now the scratchpad)
-          // The IDE page will decide whether to load saved exercise progress or this initial code
+          const isTeacher = user?.role === 'TEACHER' || user?.role === 'ADMIN';
+          const shouldBeExam = topic.isExam && !isTeacher;
+          
+          localStorage.setItem('clab-exercise-is-exam', shouldBeExam ? "true" : "false");
+          if (shouldBeExam) {
+              localStorage.setItem('clab-classroom-id', selectedClassroom.id.toString());
+              localStorage.setItem('clab-topic-id', topic.id.toString());
+          } else {
+              localStorage.removeItem('clab-classroom-id');
+              localStorage.removeItem('clab-topic-id');
+          }
+          
+          if (topic.expireDate) localStorage.setItem('clab-exercise-expire-date', topic.expireDate);
+          else localStorage.removeItem('clab-exercise-expire-date');
+
           localStorage.setItem('clab-target-initial-code', ex.initialCode || "");
           
           router.push('/');
@@ -145,8 +165,21 @@ export default function StudentDashboard() {
                         </button>
 
                         <header className="mb-8 border-b border-border pb-4">
-                            <h1 className="text-3xl font-bold text-foreground mb-2">{selectedClassroom.name}</h1>
-                            <p className="text-secondary">Listas de exercícios disponíveis.</p>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h1 className="text-3xl font-bold text-foreground mb-2">{selectedClassroom.name}</h1>
+                                    <p className="text-secondary">Listas de exercícios disponíveis.</p>
+                                </div>
+                                {selectedClassroom.activeExamId && (
+                                    <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 flex items-center space-x-3 text-red-500 animate-pulse">
+                                        <Shield size={24} />
+                                        <div>
+                                            <h3 className="font-bold text-sm uppercase tracking-wide">Modo Prova Ativo</h3>
+                                            <p className="text-xs opacity-80">Ambiente restrito.</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </header>
 
                         {loadingTopics ? (
@@ -161,21 +194,45 @@ export default function StudentDashboard() {
                             </div>
                         ) : (
                             <div className="space-y-4">
+
                                 {topics.map((topic) => {
-                                    const isExpanded = expandedTopic === topic.id;
+                                    // Filter by Active Exam Topic ID
+                                    if (selectedClassroom.activeExamId && selectedClassroom.activeExamId !== topic.id) {
+                                        return null;
+                                    }
+
+                                    const isExpanded = expandedTopic === topic.id || (selectedClassroom.activeExamId === topic.id);
+                                    const isExpired = topic.expireDate && new Date(topic.expireDate) < new Date();
+                                    
                                     return (
-                                        <div key={topic.id} className="bg-surface border border-border rounded-xl overflow-hidden">
+                                        <div key={topic.id} className={`bg-surface border rounded-xl overflow-hidden ${selectedClassroom.activeExamId ? 'border-red-500/30 ring-1 ring-red-500/10' : 'border-border'}`}>
                                             <div 
                                                 onClick={() => setExpandedTopic(isExpanded ? null : topic.id)}
                                                 className="p-5 flex items-center justify-between cursor-pointer hover:bg-surface-hover transition-colors"
                                             >
                                                 <div className="flex items-center space-x-4">
-                                                    <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                                                        <Code2 size={20} />
+                                                    <div className={`p-2 rounded-lg ${topic.isExam ? 'bg-red-500/10 text-red-500' : 'bg-primary/10 text-primary'}`}>
+                                                        {topic.isExam ? <Shield size={20} /> : <Code2 size={20} />}
                                                     </div>
                                                     <div>
-                                                        <h3 className="text-lg font-semibold text-foreground">{topic.title}</h3>
-                                                        <p className="text-xs text-secondary uppercase font-bold tracking-wider">{topic.exercises?.length || 0} exercícios</p>
+                                                        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                                                            {topic.title}
+                                                            {topic.isExam && (
+                                                                <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full uppercase font-bold">Prova</span>
+                                                            )}
+                                                        </h3>
+                                                        <div className="flex items-center space-x-3 text-xs text-secondary mt-1">
+                                                            <span className="uppercase font-bold tracking-wider">{topic.exercises?.length || 0} exercícios</span>
+                                                            {topic.expireDate && (
+                                                                <span className={`flex items-center gap-1 font-medium ${isExpired ? 'text-red-400' : 'text-orange-400'}`}>
+                                                                    <Clock size={12} />
+                                                                    <span>
+                                                                        {isExpired ? "Expirou em: " : "Expira em: "} 
+                                                                        {new Date(topic.expireDate).toLocaleString('pt-BR')}
+                                                                    </span>
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <button className="text-secondary hover:text-foreground transition-colors">
@@ -185,20 +242,30 @@ export default function StudentDashboard() {
 
                                             {isExpanded && (
                                                 <div className="px-5 pb-5 pt-2 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
-                                                    {topic.exercises?.map((ex) => (
-                                                        <div key={ex.id} className="bg-background border border-border p-4 rounded-lg hover:border-primary/50 transition-all group shadow-sm">
+                                                    {topic.exercises?.map((ex) => {
+                                                        return (
+                                                        <div key={ex.id} className={`bg-background border p-4 rounded-lg transition-all group shadow-sm ${selectedClassroom.activeExamId ? 'border-red-500/50 ring-1 ring-red-500/20' : 'border-border hover:border-primary/50'}`}>
                                                             <div className="flex justify-between items-start mb-2">
-                                                                <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">{ex.title}</h4>
+                                                                <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                                                                    {ex.title}
+                                                                </h4>
                                                                 <button 
-                                                                    onClick={() => handleSolveExercise(ex)}
-                                                                    className="px-3 py-1 bg-primary hover:bg-primary-hover text-white text-[10px] font-bold rounded uppercase transition-colors"
+                                                                    onClick={() => handleSolveExercise(ex, topic)}
+                                                                    disabled={isExpired && !selectedClassroom.activeExamId}
+                                                                    className={`px-3 py-1 text-[10px] font-bold rounded uppercase transition-colors ${
+                                                                        selectedClassroom.activeExamId 
+                                                                            ? 'bg-red-500 hover:bg-red-600 text-white'
+                                                                            : isExpired 
+                                                                                ? 'bg-surface-hover text-secondary cursor-not-allowed'
+                                                                                : 'bg-primary hover:bg-primary-hover text-white'
+                                                                    }`}
                                                                 >
-                                                                    Resolver
+                                                                    {selectedClassroom.activeExamId ? 'Resolver' : isExpired ? 'Expirado' : 'Resolver'}
                                                                 </button>
                                                             </div>
-                                                            <p className="text-xs text-secondary line-clamp-2 leading-relaxed">{ex.description}</p>
+                                                            <p className="text-xs text-secondary line-clamp-2 leading-relaxed mb-3">{ex.description}</p>
                                                         </div>
-                                                    ))}
+                                                    )})}
                                                     {(!topic.exercises || topic.exercises.length === 0) && (
                                                         <p className="text-xs text-secondary col-span-full italic py-2">Esta lista ainda não possui exercícios.</p>
                                                     )}

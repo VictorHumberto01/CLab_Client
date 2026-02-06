@@ -35,14 +35,27 @@ const ClassroomsView = () => {
     const [newClassroomName, setNewClassroomName] = useState("");
     const [selectedClassroom, setSelectedClassroom] = useState(null);
     const [studentEmail, setStudentEmail] = useState("");
+    const [studentMatricula, setStudentMatricula] = useState("");
+    const [addStudentMode, setAddStudentMode] = useState('email'); // 'email' or 'matricula'
     const [error, setError] = useState("");
     const [activeTab, setActiveTab] = useState('students');
-    const [newExercise, setNewExercise] = useState({ topicId: 0, title: "", description: "", expectedOutput: "", initialCode: "" });
+    const [newExercise, setNewExercise] = useState({ 
+        topicId: 0, 
+        title: "", 
+        description: "", 
+        expectedOutput: "", 
+        initialCode: "",
+        examMaxNote: 10.0
+    });
     const [topics, setTopics] = useState([]);
     const [loadingTopics, setLoadingTopics] = useState(false);
     const [showTopicModal, setShowTopicModal] = useState(false);
     const [showExerciseModal, setShowExerciseModal] = useState(false);
-    const [newTopicTitle, setNewTopicTitle] = useState("");
+    const [newTopic, setNewTopic] = useState({
+        title: "",
+        expireDate: "",
+        isExam: false
+    });
     const [expandedTopic, setExpandedTopic] = useState(null);
     const [expandedStudentActivity, setExpandedStudentActivity] = useState(null);
     const [studentHistory, setStudentHistory] = useState([]);
@@ -86,14 +99,20 @@ const ClassroomsView = () => {
         e.preventDefault();
         if (!selectedClassroom) return;
         try {
-            const res = await api.post(`/classrooms/${selectedClassroom.id}/students`, { email: studentEmail });
+            const payload = addStudentMode === 'email' 
+                ? { email: studentEmail } 
+                : { matricula: studentMatricula };
+            const res = await api.post(`/classrooms/${selectedClassroom.id}/students`, payload);
             if (res.data.success) {
                 setStudentEmail("");
+                setStudentMatricula("");
                 alert("Aluno adicionado com sucesso!");
                 fetchClassrooms(); 
             }
         } catch (err) {
-            alert("Falha ao adicionar aluno. Verifique o email.");
+            alert(addStudentMode === 'email' 
+                ? "Falha ao adicionar aluno. Verifique o email." 
+                : "Falha ao adicionar aluno. Verifique a matrícula.");
         }
     };
 
@@ -132,10 +151,14 @@ const ClassroomsView = () => {
     const handleCreateTopic = async (e) => {
         e.preventDefault();
         try {
-            const res = await api.post(`/classrooms/${selectedClassroom.id}/topics`, { title: newTopicTitle });
+            const payload = {
+                ...newTopic,
+                expireDate: newTopic.expireDate ? new Date(newTopic.expireDate).toISOString() : null
+            };
+            const res = await api.post(`/classrooms/${selectedClassroom.id}/topics`, payload);
             if (res.data.success) {
                 setShowTopicModal(false);
-                setNewTopicTitle("");
+                setNewTopic({ title: "", expireDate: "", isExam: false });
                 fetchTopics(selectedClassroom.id);
             }
         } catch (err) {
@@ -150,7 +173,14 @@ const ClassroomsView = () => {
             const res = await api.post(`/classrooms/${selectedClassroom.id}/exercises`, newExercise);
             if (res.data.success) {
                 setShowExerciseModal(false);
-                setNewExercise({ topicId: 0, title: "", description: "", expectedOutput: "", initialCode: "" });
+                setNewExercise({ 
+                    topicId: 0, 
+                    title: "", 
+                    description: "", 
+                    expectedOutput: "", 
+                    initialCode: "",
+                    examMaxNote: 10.0
+                });
                 fetchTopics(selectedClassroom.id);
             }
         } catch (err) {
@@ -278,21 +308,48 @@ const ClassroomsView = () => {
                                     </div>
                                     Adicionar Aluno
                                 </h3>
-                                <form onSubmit={handleAddStudent} className="flex gap-3">
-                                    <div className="flex-1 relative">
-                                        <input 
-                                            type="email" 
-                                            placeholder="Email do aluno..."
-                                            value={studentEmail}
-                                            onChange={(e) => setStudentEmail(e.target.value)}
-                                            className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                                            required
-                                        />
+                                <form onSubmit={handleAddStudent} className="space-y-3">
+                                    <div className="flex gap-2 mb-3">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setAddStudentMode('email')}
+                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${addStudentMode === 'email' ? 'bg-primary text-white' : 'bg-background border border-border text-secondary'}`}
+                                        >
+                                            Por Email
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setAddStudentMode('matricula')}
+                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${addStudentMode === 'matricula' ? 'bg-primary text-white' : 'bg-background border border-border text-secondary'}`}
+                                        >
+                                            Por Matrícula
+                                        </button>
                                     </div>
-                                    <button type="submit" className="bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded-xl font-medium transition-colors flex items-center space-x-2">
-                                        <Plus size={18} />
-                                        <span>Adicionar</span>
-                                    </button>
+                                    <div className="flex gap-3">
+                                        {addStudentMode === 'email' ? (
+                                            <input 
+                                                type="email" 
+                                                placeholder="Email do aluno..."
+                                                value={studentEmail}
+                                                onChange={(e) => setStudentEmail(e.target.value)}
+                                                className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                                                required
+                                            />
+                                        ) : (
+                                            <input 
+                                                type="text" 
+                                                placeholder="Matrícula do aluno..."
+                                                value={studentMatricula}
+                                                onChange={(e) => setStudentMatricula(e.target.value)}
+                                                className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                                                required
+                                            />
+                                        )}
+                                        <button type="submit" className="bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded-xl font-medium transition-colors flex items-center space-x-2">
+                                            <Plus size={18} />
+                                            <span>Adicionar</span>
+                                        </button>
+                                    </div>
                                 </form>
                             </div>
 
@@ -562,6 +619,21 @@ const ClassroomsView = () => {
                                             />
                                         </div>
                                     </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-border pt-4">
+                                        <div>
+                                            <label className="block text-sm text-secondary mb-2 font-medium">Nota Máxima</label>
+                                            <input 
+                                                type="number"
+                                                step="0.1"
+                                                min="0"
+                                                value={newExercise.examMaxNote}
+                                                onChange={(e) => setNewExercise({...newExercise, examMaxNote: parseFloat(e.target.value)})}
+                                                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all text-sm"
+                                            />
+                                            <p className="text-xs text-secondary mt-1">Usado apenas se a lista for uma Prova</p>
+                                        </div>
+                                    </div>
                                     
                                     <div className="flex gap-3 pt-4">
                                         <button 
@@ -610,13 +682,26 @@ const ClassroomsView = () => {
                                         <label className="block text-sm text-secondary mb-2 font-medium">Título da Lista</label>
                                         <input 
                                             type="text" 
-                                            value={newTopicTitle}
-                                            onChange={(e) => setNewTopicTitle(e.target.value)}
+                                            value={newTopic.title}
+                                            onChange={(e) => setNewTopic({...newTopic, title: e.target.value})}
                                             placeholder="Ex: Alocação Dinâmica"
                                             className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
                                             required
                                         />
                                     </div>
+                                    
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-secondary mb-2 font-medium">Expiração (Opcional)</label>
+                                            <input 
+                                                type="datetime-local" 
+                                                value={newTopic.expireDate}
+                                                onChange={(e) => setNewTopic({...newTopic, expireDate: e.target.value})}
+                                                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all text-sm"
+                                            />
+                                        </div>
+                                    </div>
+
                                     <div className="flex gap-3 pt-2">
                                         <button 
                                             type="button"

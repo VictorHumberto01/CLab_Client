@@ -20,11 +20,19 @@ const MenuBar = ({ runInCloud, stopCode, isRunning, showAiPanel, setShowAiPanel,
   const { user, logout } = useAuth();
   const router = useRouter();
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
+  
+  // Detect if running on macOS (traffic lights on left) or Windows (controls on right)
+  const [isMac, setIsMac] = React.useState(true);
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsMac(navigator.platform.toLowerCase().includes('mac'));
+    }
+  }, []);
 
   return (
     <div className="h-10 border-b border-border bg-surface flex items-center justify-between px-3 select-none app-drag">
       {/* Left: Branding & Actions */}
-      <div className="flex items-center space-x-4 pl-20">
+      <div className={`flex items-center space-x-4 ${isMac ? 'pl-20' : 'pl-2'}`}>
         <div className="flex items-center space-x-2 opacity-80 hover:opacity-100 transition-opacity">
           <Code className="text-primary" size={16} />
           <span className="font-semibold text-foreground text-sm tracking-tight">CLab IDE</span>
@@ -95,7 +103,7 @@ const MenuBar = ({ runInCloud, stopCode, isRunning, showAiPanel, setShowAiPanel,
       </div>
 
       {/* Right: Tools & Profile */}
-      <div className="flex items-center space-x-2 no-drag">
+      <div className={`flex items-center space-x-2 no-drag ${isMac ? 'pr-2' : 'pr-36'}`}>
           <button
           onClick={() => setShowAiPanel(!showAiPanel)}
           className={`p-1.5 rounded transition-all flex items-center text-xs font-medium ${

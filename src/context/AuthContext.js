@@ -70,8 +70,23 @@ export const AuthProvider = ({ children }) => {
     router.push('/');
   };
 
+  // Login with an already obtained token (e.g., from matricula login)
+  const loginWithToken = async (token) => {
+    if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.setItem === 'function') {
+      window.localStorage.setItem('token', token);
+    }
+    try {
+      const validateRes = await api.get('/validate');
+      if (validateRes.data.success) {
+        setUser(validateRes.data.data);
+      }
+    } catch (error) {
+      console.error("Token validation failed", error);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, loginWithToken, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

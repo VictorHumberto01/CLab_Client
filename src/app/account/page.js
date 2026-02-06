@@ -28,6 +28,16 @@ export default function AccountPage() {
     }
   }, [user, loading, router]);
 
+  // Block access if in Exam Mode
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+        const isExam = localStorage.getItem('clab-exercise-is-exam') === 'true';
+        if (isExam) {
+            router.push('/'); // Force back to IDE
+        }
+    }
+  }, [router]);
+
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {

@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import { Terminal as TerminalIcon } from "lucide-react";
+import { Terminal as TerminalIcon, Shield, CheckCircle } from "lucide-react";
 import ReactMarkdown from "react-markdown"; // Import ReactMarkdown
-import IntroModal from "../components/IntroModal";
 import MenuBar from "../components/MenuBar";
 import AnalysisPanel from "../components/AIPanel/AnalysisPanel"; 
 import Terminal from "../components/Terminal/Terminal";
@@ -27,9 +26,10 @@ int main() {
   const [isRunning, setIsRunning] = useState(false);
   const [exerciseId, setExerciseId] = useState(null);
   const [exercise, setExercise] = useState(null);
-  const [exerciseDescription, setExerciseDescription] = useState(""); 
+  const [exerciseDescription, setExerciseDescription] = useState("");
+  const [isExam, setIsExam] = useState(false);
+  const [expireDate, setExpireDate] = useState(null);
   const [showAiPanel, setShowAiPanel] = useState(true);
-  const [showIntro, setShowIntro] = useState(true);
   
   // WebSocket State
   const wsRef = useRef(null);
@@ -69,6 +69,15 @@ int main() {
             const storedDesc = localStorage.getItem('clab-exercise-description');
             if (storedDesc) setExerciseDescription(storedDesc);
 
+            const storedIsExam = localStorage.getItem('clab-exercise-is-exam');
+            const isExamMode = storedIsExam === 'true';
+            setIsExam(isExamMode);
+            if (isExamMode) setShowAiPanel(false); // Force AI Panel off for exams
+
+            const storedExpire = localStorage.getItem('clab-exercise-expire-date');
+            if (storedExpire) setExpireDate(storedExpire);
+            else setExpireDate(null);
+
             const savedExerciseCode = localStorage.getItem(`clab-code-exercise-${exId}`);
             if (savedExerciseCode) {
                 setCode(savedExerciseCode);
@@ -107,6 +116,110 @@ int main() {
     }
   }, [code, exerciseId]);
 
+  // Exam Mode State
+  const [examQuestions, setExamQuestions] = useState([]);
+  const [examTopicTitle, setExamTopicTitle] = useState("");
+  const [submittedQuestions, setSubmittedQuestions] = useState(new Set());
+
+  // Auto-detect Active Exam on Load
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user) return;
+    
+    const checkForActiveExam = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const baseUrl = window.localStorage.getItem('clab-server-ip') || 'http://localhost:8080';
+            
+            // Fetch classrooms
+            const res = await fetch(`${baseUrl}/classrooms`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const json = await res.json();
+            
+            if (json.success && json.data) {
+                // Find a classroom with an active exam
+                const classroomWithExam = json.data.find(cls => cls.activeExamId);
+                
+                if (classroomWithExam) {
+                    // Fetch topics for this classroom
+                    const topicsRes = await fetch(`${baseUrl}/classrooms/${classroomWithExam.id}/topics`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const topicsJson = await topicsRes.json();
+                    
+                    if (topicsJson.success && topicsJson.data) {
+                        const examTopic = topicsJson.data.find(t => t.id === classroomWithExam.activeExamId);
+                        
+                        if (examTopic && examTopic.exercises && examTopic.exercises.length > 0) {
+                            // Activate Exam Mode!
+                            setIsExam(true);
+                            setShowAiPanel(false);
+                            setExamQuestions(examTopic.exercises);
+                            setExamTopicTitle(examTopic.title);
+                            
+                            // Store context
+                            localStorage.setItem('clab-classroom-id', classroomWithExam.id.toString());
+                            localStorage.setItem('clab-topic-id', examTopic.id.toString());
+                            localStorage.setItem('clab-exercise-is-exam', 'true');
+                            
+                            // If no exercise is currently selected, auto-select the first one
+                            if (!exerciseId && examTopic.exercises[0]) {
+                                const firstQ = examTopic.exercises[0];
+                                setExerciseId(firstQ.id);
+                                setExercise(firstQ);
+                                setExerciseDescription(firstQ.description || "");
+                                setCode(firstQ.initialCode || "// Escreva seu código aqui");
+                            }
+                        }
+                    }
+                } else {
+                    // No active exam, clear exam state if it was set
+                    if (isExam) {
+                        setIsExam(false);
+                        setExamQuestions([]);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Failed to check for active exam", e);
+        }
+    };
+    
+    checkForActiveExam();
+  }, [user]);
+
+  // Fetch Exam Questions (fallback if already in exam mode from localStorage)
+  useEffect(() => {
+    if (isExam && examQuestions.length === 0 && typeof window !== 'undefined') {
+        const clsId = localStorage.getItem('clab-classroom-id');
+        const topicId = localStorage.getItem('clab-topic-id');
+        
+        if (clsId && topicId) {
+             const fetchExamData = async () => {
+                 try {
+                     const token = localStorage.getItem('token');
+                     const baseUrl = window.localStorage.getItem('clab-server-ip') || 'http://localhost:8080';
+                     
+                     const res = await fetch(`${baseUrl}/classrooms/${clsId}/topics`, {
+                         headers: { 'Authorization': `Bearer ${token}` }
+                     });
+                     const json = await res.json();
+                     if (json.success) {
+                         const topic = json.data.find(t => t.id.toString() === topicId);
+                         if (topic && topic.exercises) {
+                             setExamQuestions(topic.exercises);
+                             setExamTopicTitle(topic.title);
+                         }
+                     }
+                 } catch (e) {
+                     console.error("Failed to fetch exam questions", e);
+                 }
+             };
+             fetchExamData();
+        }
+    }
+  }, [isExam, examQuestions.length]);
+
   // Auto-save exercise metadata
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -135,12 +248,10 @@ int main() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     let wsUrl = `${getWsUrl()}/ws`;
 
-    if (typeof window !== 'undefined') {
-        const token = localStorage.getItem('token');
-        if (token) {
-            wsUrl += `?token=${token}`;
-        }
-    } 
+    const token = localStorage.getItem('token');
+    if (token) {
+        wsUrl += `?token=${token}`;
+    }
     
     if (wsRef.current) {
         wsRef.current.close();
@@ -287,6 +398,14 @@ int main() {
   const submitInCloud = () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     if (!exerciseId) return;
+    
+    // Prevent double submission only for exams
+    if (isExam && submittedQuestions.has(exerciseId)) {
+        if (terminalRef.current?.term) {
+            terminalRef.current.term.writeln('\x1b[33m[Esta questão já foi enviada!]\x1b[0m');
+        }
+        return;
+    }
 
     setIsRunning(true);
     if (terminalRef.current?.term) {
@@ -294,11 +413,57 @@ int main() {
         terminalRef.current.term.writeln('\x1b[35m[Submitting for Validation...]\x1b[0m');
     }
 
+    // Mark as submitted
+    const newSubmitted = new Set(submittedQuestions);
+    newSubmitted.add(exerciseId);
+    setSubmittedQuestions(newSubmitted);
+
     wsRef.current.send(JSON.stringify({ 
         type: "run_code", 
         payload: code, 
         exerciseId: parseInt(exerciseId) 
     }));
+    
+    // Check if all exam questions are now submitted
+    if (isExam && examQuestions.length > 0) {
+        const allSubmitted = examQuestions.every(q => newSubmitted.has(q.id));
+        if (allSubmitted) {
+            // Auto-exit exam after a short delay to show feedback
+            setTimeout(() => {
+                alert("Prova finalizada! Todas as questões foram enviadas.");
+                
+                // Clear exam state
+                setIsExam(false);
+                setExamQuestions([]);
+                setSubmittedQuestions(new Set());
+                setExerciseId(null);
+                setExercise(null);
+                setExerciseDescription("");
+                setShowAiPanel(true);
+                
+                // Clear localStorage
+                localStorage.removeItem('clab-exercise-id');
+                localStorage.removeItem('clab-exercise-title');
+                localStorage.removeItem('clab-exercise-description');
+                localStorage.removeItem('clab-exercise-is-exam');
+                localStorage.removeItem('clab-classroom-id');
+                localStorage.removeItem('clab-topic-id');
+                
+                // Restore scratchpad
+                const savedScratchpad = localStorage.getItem('clab-code-scratchpad');
+                if (savedScratchpad) {
+                    setCode(savedScratchpad);
+                } else {
+                    setCode(`#include <stdio.h>
+
+int main() {
+    printf("Hello, World!\\n");
+    return 0;
+}`);
+                }
+            }, 1500);
+        }
+    }
   };
 
   const exitExercise = () => {
@@ -320,15 +485,23 @@ int main() {
       }
   };
 
+
   const handleExitExercise = () => {
+      if (isExam) {
+          if (!confirm("Tem certeza? Esta é uma prova! Se sair agora, nada será salvo além do histórico de envio.")) return;
+      }
       setExerciseId(null);
       setExercise(null);
       setExerciseDescription("");
+      setIsExam(false);
+      setExpireDate(null);
       
       if (typeof window !== 'undefined') {
           localStorage.removeItem('clab-exercise-id');
           localStorage.removeItem('clab-exercise-title');
           localStorage.removeItem('clab-exercise-description');
+          localStorage.removeItem('clab-exercise-is-exam');
+          localStorage.removeItem('clab-exercise-expire-date');
           
           const savedScratchpad = localStorage.getItem('clab-code-scratchpad');
           if (savedScratchpad) {
@@ -358,6 +531,15 @@ int main() {
             submitInCloud={submitInCloud}
             exitExercise={handleExitExercise}
         />
+        
+        {/* Exam Banner - Non-overlapping */}
+        {isExam && (
+            <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-center font-bold text-sm shadow-lg shadow-red-500/20">
+                <span className="w-2 h-2 rounded-full bg-white mr-2 animate-pulse"/>
+                MODO PROVA - IA DESATIVADA
+                <span className="ml-4 text-xs font-normal opacity-80">({submittedQuestions.size}/{examQuestions.length} enviadas)</span>
+            </div>
+        )}
       
       <div className="flex flex-1 min-h-0 pt-0 px-0 pb-0 gap-0">
         {/* Main Editor + Terminal Section */}
@@ -372,6 +554,8 @@ int main() {
                  </div>
              </div>
         )}
+
+
 
         {/* Main Editor + Terminal Section */}
         <div className="flex flex-col flex-1 min-w-0">
@@ -430,8 +614,8 @@ int main() {
           </div>
         </div>
 
-        {/* AI Analysis Panel */}
-        {showAiPanel && (
+        {/* AI Analysis Panel or Exam Questions */}
+        {(showAiPanel && !isExam) ? (
           <div className="w-[350px] shrink-0 border-l border-border bg-background">
              <AnalysisPanel
                 code={code}
@@ -440,10 +624,53 @@ int main() {
                 aiAnalysis={aiAnalysis}
              />
           </div>
-        )}
+        ) : (isExam) ? (
+            <div className="w-[300px] shrink-0 border-l border-border bg-surface flex flex-col">
+                <div className="p-4 border-b border-border bg-red-500/5">
+                    <h3 className="font-bold text-red-500 flex items-center gap-2">
+                        <Shield size={18} />
+                        Questões da Prova
+                    </h3>
+                    <p className="text-xs text-secondary mt-1">Navegue pelas questões livremente.</p>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                    {examQuestions.map((q, idx) => (
+                        <button 
+                            key={q.id}
+                            onClick={() => {
+                                if (q.id === exerciseId) return;
+                                if (confirm("Trocar de questão? Certifique-se de ter enviado seu código.")) {
+                                    setExerciseId(q.id);
+                                    setExercise(q);
+                                    setExerciseDescription(q.description);
+                                    setCode(q.initialCode || "// Escreva seu código aqui");
+                                    // Update persistent state logic for the new question would happen via existing effects
+                                }
+                            }}
+                            className={`w-full text-left p-3 rounded-lg border transition-all ${
+                                submittedQuestions.has(q.id)
+                                    ? 'bg-green-500/10 border-green-500 text-green-500'
+                                    : q.id === exerciseId
+                                        ? 'bg-primary/10 border-primary text-primary' 
+                                        : 'bg-background border-border hover:border-primary/50 hover:bg-surface-hover text-foreground'
+                            }`}
+                        >
+                            <div className="font-medium text-sm truncate flex items-center justify-between">
+                                <span>Q{idx + 1}. {q.title}</span>
+                                {submittedQuestions.has(q.id) && <CheckCircle size={16} className="text-green-500" />}
+                            </div>
+                        </button>
+                    ))}
+                    {examQuestions.length === 0 && (
+                        <div className="text-center py-10 text-secondary text-sm">
+                            Carregando questões...
+                        </div>
+                    )}
+                </div>
+            </div>
+        ) : null}
       </div>
 
-      <IntroModal isOpen={showIntro} onClose={() => setShowIntro(false)} />
     </div>
   </div>
   );
