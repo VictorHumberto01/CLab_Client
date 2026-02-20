@@ -114,6 +114,8 @@ A natureza assíncrona da execução interativa (ex: um programa esperando a ent
 - O painel discente monta um terminal utilizando **XTerm.js**, estabelecendo uma sessão persistente com o módulo `ws` no Go.
 - Quando o serviço C requer entrada, a goroutine paralisa a stream do sub-processo (`STDIN`) e sinaliza o WebClient. O pacote trafega nos frames do WebSocket para dentro do buffer reservado do Firejail, fluindo como se a execução daquele binário não estivesse há quilômetros de distância.
 
+---
+
 ### 3. Pipeline de Avaliação Inteligente
 
 O fluxo da inferência local opera processamento cognitivo desprovido das latências típicas da nuvem:
@@ -163,4 +165,5 @@ npm run electron-dev
 
 ## 📝 Licença
 
-Copyright © 2026 Victor Humberto. Todos os direitos reservados.
+Este projeto é licenciado sob a **GNU General Public License v2.0 (GPL-2.0)**.
+O CLab é um software livre; você pode redistribuí-lo e/ou modificá-lo sob os termos da licença GNU GPL v2 conforme publicada pela Free Software Foundation.
