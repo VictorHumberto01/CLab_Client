@@ -127,10 +127,10 @@ O **CLab Client** é apenas a ponta do iceberg. Ele se comunica com o **CLab Ser
 
 ```mermaid
 graph LR
-    A[CLab Client (Electron)] -- WebSocket/HTTP --> B[CLab Server (Go)]
-    B -- Firejail --> C[Sandbox (Execução Segura)]
-    B -- HTTP --> D[Ollama (IA Local)]
-    B -- SQL --> E[Banco de Dados]
+    A["CLab Client (Electron)"] -- WebSocket/HTTP --> B["CLab Server (Go)"]
+    B -- Firejail --> C["Sandbox (Execução Segura)"]
+    B -- HTTP --> D["Ollama (IA Local)"]
+    B -- SQL --> E["Banco de Dados"]
 ```
 
 ---
