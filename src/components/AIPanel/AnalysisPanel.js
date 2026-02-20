@@ -6,10 +6,50 @@ import { Bot, Loader2, Sparkles, AlertTriangle, CheckCircle, Lightbulb } from 'l
 import { motion, AnimatePresence } from 'framer-motion';
 
 const AnalysisPanel = ({ code, user, isAnalyzing, aiAnalysis }) => {
-  // Detect the type of analysis based on content keywords
+  // Parse AI Analysis content
+  let parsedAnalysis = null;
+  let analysisContent = "";
+  
+  if (aiAnalysis) {
+      try {
+          // Attempt to parse as JSON
+          if (aiAnalysis.trim().startsWith('{')) {
+             parsedAnalysis = JSON.parse(aiAnalysis);
+             analysisContent = parsedAnalysis.content;
+          } else {
+             analysisContent = aiAnalysis;
+          }
+      } catch (e) {
+          console.warn("Failed to parse AI Analysis JSON", e);
+          
+          // Fallback: Regex extraction for common JSON issues (like unescaped newlines)
+          const statusMatch = aiAnalysis.match(/"status"\s*:\s*"([^"]+)"/);
+          const contentMatch = aiAnalysis.match(/"content"\s*:\s*"([\s\S]*?)"\s*}/);
+          
+          if (statusMatch && contentMatch) {
+              parsedAnalysis = { 
+                  status: statusMatch[1], 
+                  content: contentMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"') // Unescape manually
+              };
+              analysisContent = parsedAnalysis.content;
+          } else {
+              // Final fallback: just clean up formatting artifacts if possible, or show raw
+              analysisContent = aiAnalysis;
+          }
+      }
+  }
+
+  // Detect the type of analysis based on content keywords or JSON status
   const getAnalysisType = () => {
     if (!aiAnalysis) return null;
-    const lower = aiAnalysis.toLowerCase();
+    
+    // Priority: JSON status
+    if (parsedAnalysis && parsedAnalysis.status) {
+        return parsedAnalysis.status; // 'success', 'error', 'info'
+    }
+
+    // Fallback: Keyword matching
+    const lower = analysisContent.toLowerCase();
     if (lower.includes('erro') || lower.includes('error')) return 'error';
     if (lower.includes('sucesso') || lower.includes('correto') || lower.includes('parabéns')) return 'success';
     return 'info';
@@ -152,7 +192,7 @@ const AnalysisPanel = ({ code, user, isAnalyzing, aiAnalysis }) => {
                 prose-strong:text-foreground prose-strong:font-semibold
                 prose-a:text-primary prose-a:no-underline hover:prose-a:underline
               ">
-                <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
+                <ReactMarkdown>{analysisContent}</ReactMarkdown>
               </div>
             </motion.div>
           )}

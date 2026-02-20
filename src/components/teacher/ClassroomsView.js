@@ -25,7 +25,9 @@ import {
   Eye,
   Calendar,
   Activity,
-  Loader2
+  Loader2,
+  UserPlus,
+  GraduationCap
 } from "lucide-react";
 
 const ClassroomsView = () => {
@@ -62,6 +64,7 @@ const ClassroomsView = () => {
     const [loadingStudentHistory, setLoadingStudentHistory] = useState(false);
     const [expandedExercise, setExpandedExercise] = useState(null);
     const [selectedSubmission, setSelectedSubmission] = useState(null);
+    const [teacherEmail, setTeacherEmail] = useState("");
 
     const fetchClassrooms = async () => {
         setLoading(true);
@@ -130,6 +133,37 @@ const ClassroomsView = () => {
             }
         } catch (err) {
             alert("Erro ao remover aluno.");
+            console.error(err);
+        }
+    };
+
+    const handleAddTeacher = async (e) => {
+        e.preventDefault();
+        if (!selectedClassroom) return;
+        try {
+            const res = await api.post(`/classrooms/${selectedClassroom.id}/teachers`, { email: teacherEmail });
+            if (res.data.success) {
+                setTeacherEmail("");
+                alert("Professor adicionado com sucesso!");
+                fetchClassrooms();
+            }
+        } catch (err) {
+            alert("Falha ao adicionar professor. Verifique o email.");
+        }
+    };
+
+    const handleRemoveTeacher = async (teacherId) => {
+        if (!selectedClassroom) return;
+        if (!confirm("Tem certeza que deseja remover este professor da turma?")) return;
+
+        try {
+            const res = await api.delete(`/classrooms/${selectedClassroom.id}/teachers/${teacherId}`);
+            if (res.data.success) {
+                alert("Professor removido com sucesso.");
+                fetchClassrooms();
+            }
+        } catch (err) {
+            alert("Erro ao remover professor.");
             console.error(err);
         }
     };
@@ -273,6 +307,7 @@ const ClassroomsView = () => {
                 <div className="flex gap-1 mb-8 p-1 bg-surface rounded-xl w-fit">
                     {[
                         { id: 'students', label: 'Alunos', icon: Users },
+                        { id: 'teachers', label: 'Professores', icon: GraduationCap },
                         { id: 'exercises', label: 'Exercícios', icon: Code2 }
                     ].map(tab => (
                         <button 
@@ -404,6 +439,113 @@ const ClassroomsView = () => {
                                         </div>
                                         <p className="text-secondary text-sm">Nenhum aluno matriculado nesta turma.</p>
                                         <p className="text-secondary/60 text-xs mt-1">Adicione alunos usando o formulário acima.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Teachers Tab */}
+                    {activeTab === 'teachers' && (
+                        <motion.div 
+                            key="teachers"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="space-y-6"
+                        >
+                            {/* Add Teacher - Only shown to owner */}
+                            {selectedClassroom.teacherId === (JSON.parse(localStorage.getItem('user') || '{}').id) && (
+                                <div className="bg-surface border border-border rounded-2xl p-6">
+                                    <h3 className="text-base font-semibold text-foreground mb-4 flex items-center">
+                                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center mr-3">
+                                            <UserPlus size={16} className="text-primary" />
+                                        </div>
+                                        Adicionar Professor
+                                    </h3>
+                                    <form onSubmit={handleAddTeacher} className="flex gap-3">
+                                        <input 
+                                            type="email" 
+                                            placeholder="Email do professor..."
+                                            value={teacherEmail}
+                                            onChange={(e) => setTeacherEmail(e.target.value)}
+                                            className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                                            required
+                                        />
+                                        <button type="submit" className="bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded-xl font-medium transition-colors flex items-center space-x-2">
+                                            <Plus size={18} />
+                                            <span>Adicionar</span>
+                                        </button>
+                                    </form>
+                                    <p className="text-xs text-secondary mt-3">Apenas usuários com perfil de professor podem ser adicionados.</p>
+                                </div>
+                            )}
+
+                            {/* Owner Info */}
+                            <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+                                <div className="px-6 py-4 border-b border-border">
+                                    <h3 className="text-base font-semibold text-foreground">Proprietário da Turma</h3>
+                                </div>
+                                <div className="p-4">
+                                    <div className="flex items-center space-x-4">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white font-semibold text-sm">
+                                            {(selectedClassroom.teacher?.name || selectedClassroom.teacher?.email || 'P')[0].toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-foreground text-sm">{selectedClassroom.teacher?.name || 'Professor'}</p>
+                                            <p className="text-xs text-secondary">{selectedClassroom.teacher?.email}</p>
+                                        </div>
+                                        <span className="ml-auto text-xs bg-amber-500/10 text-amber-400 px-3 py-1 rounded-full font-medium">
+                                            Proprietário
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Co-Teachers List */}
+                            <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+                                <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+                                    <h3 className="text-base font-semibold text-foreground">Professores Colaboradores</h3>
+                                    <span className="text-xs text-secondary bg-surface-hover px-3 py-1 rounded-full">
+                                        {selectedClassroom.teachers?.length || 0} professores
+                                    </span>
+                                </div>
+                                
+                                {selectedClassroom.teachers && selectedClassroom.teachers.length > 0 ? (
+                                    <div className="divide-y divide-border">
+                                        {selectedClassroom.teachers.map((teacher) => (
+                                            <div key={teacher.id} className="p-4 hover:bg-surface-hover/50 transition-colors">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center space-x-4">
+                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-teal-500 flex items-center justify-center text-white font-semibold text-sm">
+                                                            {(teacher.name || teacher.email)[0].toUpperCase()}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-foreground text-sm">{teacher.name || teacher.email.split('@')[0]}</p>
+                                                            <p className="text-xs text-secondary">{teacher.email}</p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {selectedClassroom.teacherId === (JSON.parse(localStorage.getItem('user') || '{}').id) && (
+                                                        <button 
+                                                            onClick={() => handleRemoveTeacher(teacher.id)}
+                                                            className="p-2 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
+                                                            title="Remover professor"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="p-12 text-center">
+                                        <div className="w-16 h-16 rounded-full bg-surface-hover flex items-center justify-center mx-auto mb-4">
+                                            <GraduationCap size={28} className="text-secondary" />
+                                        </div>
+                                        <p className="text-secondary text-sm">Nenhum professor colaborador.</p>
+                                        <p className="text-secondary/60 text-xs mt-1">Adicione professores para colaborar nesta turma.</p>
                                     </div>
                                 )}
                             </div>
