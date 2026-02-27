@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import api from "../../utils/api";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
 import { 
   Users, 
   BookOpen, 
@@ -199,6 +200,43 @@ const ClassroomsView = () => {
             alert("Falha ao criar lista");
         }
     };
+
+    const handleDeleteTopic = async (topicId) => {
+        if (!confirm("Tem certeza que deseja excluir esta lista? Todos os exercícios nela serão perdidos. Esta ação é irreversível.")) return;
+        try {
+            const res = await api.delete(`/classrooms/${selectedClassroom.id}/topics/${topicId}`);
+            if (res.data.success) {
+                alert("Lista excluída com sucesso.");
+                fetchTopics(selectedClassroom.id);
+                if (expandedTopic === topicId) setExpandedTopic(null);
+            }
+        } catch (err) {
+            alert("Erro ao excluir lista.");
+            console.error(err);
+        }
+    };
+
+    const parseAnalysis = (aiAnalysis) => {
+        if (!aiAnalysis) return "";
+        let content = aiAnalysis;
+        try {
+            if (aiAnalysis.trim().startsWith('{')) {
+                const parsed = JSON.parse(aiAnalysis);
+                content = parsed.content || parsed.feedback || parsed.Feedback || aiAnalysis;
+            }
+        } catch (e) {
+            const contentMatch = aiAnalysis.match(/"content"\s*:\s*"([\s\S]*?)"\s*}/);
+            const feedbackMatch = aiAnalysis.match(/"feedback"\s*:\s*"([\s\S]*?)"\s*}/);
+            const match = contentMatch || feedbackMatch;
+            if (match) {
+                content = match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+            } else {
+                content = aiAnalysis.replace(/\\n/g, '\n');
+            }
+        }
+        return content;
+    };
+
 
     const handleCreateExercise = async (e) => {
         e.preventDefault();
@@ -613,7 +651,19 @@ const ClassroomsView = () => {
                                                             <p className="text-xs text-secondary">{topic.exercises?.length || 0} exercícios</p>
                                                         </div>
                                                     </div>
-                                                    <ChevronDown className={`text-secondary transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} size={20} />
+                                                    <div className="flex items-center space-x-2 text-secondary">
+                                                        <button 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDeleteTopic(topic.id);
+                                                            }}
+                                                            className="p-2 hover:bg-red-500/10 hover:text-red-400 rounded-lg transition-colors"
+                                                            title="Excluir Lista"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                        <ChevronDown className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} size={20} />
+                                                    </div>
                                                 </div>
 
                                                 <AnimatePresence>

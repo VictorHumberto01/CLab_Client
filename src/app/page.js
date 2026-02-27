@@ -83,12 +83,12 @@ int main() {
                 setCode(savedExerciseCode);
             } else {
                 const targetInitialCode = localStorage.getItem('clab-target-initial-code');
-                if (targetInitialCode) {
+                if (targetInitialCode && targetInitialCode.trim() !== "") {
                     setCode(targetInitialCode);
-                     localStorage.removeItem('clab-target-initial-code'); 
                 } else {
                     setCode(defaultCode);
                 }
+                localStorage.removeItem('clab-target-initial-code');
             }
         } else {
             setExerciseId(null);
@@ -151,24 +151,26 @@ int main() {
                         const examTopic = topicsJson.data.find(t => t.id === classroomWithExam.activeExamId);
                         
                         if (examTopic && examTopic.exercises && examTopic.exercises.length > 0) {
-                            // Activate Exam Mode!
-                            setIsExam(true);
-                            setShowAiPanel(false);
-                            setExamQuestions(examTopic.exercises);
-                            setExamTopicTitle(examTopic.title);
-                            
-                            // Store context
-                            localStorage.setItem('clab-classroom-id', classroomWithExam.id.toString());
-                            localStorage.setItem('clab-topic-id', examTopic.id.toString());
-                            localStorage.setItem('clab-exercise-is-exam', 'true');
-                            
-                            // If no exercise is currently selected, auto-select the first one
-                            if (!exerciseId && examTopic.exercises[0]) {
-                                const firstQ = examTopic.exercises[0];
-                                setExerciseId(firstQ.id);
-                                setExercise(firstQ);
-                                setExerciseDescription(firstQ.description || "");
-                                setCode(firstQ.initialCode || "// Escreva seu código aqui");
+                            if (!classroomWithExam.activeExamCompleted) {
+                                // Activate Exam Mode!
+                                setIsExam(true);
+                                setShowAiPanel(false);
+                                setExamQuestions(examTopic.exercises);
+                                setExamTopicTitle(examTopic.title);
+                                
+                                // Store context
+                                localStorage.setItem('clab-classroom-id', classroomWithExam.id.toString());
+                                localStorage.setItem('clab-topic-id', examTopic.id.toString());
+                                localStorage.setItem('clab-exercise-is-exam', 'true');
+                                
+                                // If no exercise is currently selected, auto-select the first one
+                                if (!exerciseId && examTopic.exercises[0]) {
+                                    const firstQ = examTopic.exercises[0];
+                                    setExerciseId(firstQ.id);
+                                    setExercise(firstQ);
+                                    setExerciseDescription(firstQ.description || "");
+                                    setCode(firstQ.initialCode || "// Escreva seu código aqui");
+                                }
                             }
                         }
                     }
@@ -219,6 +221,15 @@ int main() {
         }
     }
   }, [isExam, examQuestions.length]);
+
+  // Sync Exam Mode with Electron Native App (Fullscreen, Block Alt-Tab)
+  useEffect(() => {
+      if (typeof window !== 'undefined' && window.electron && window.electron.invoke) {
+          window.electron.invoke('toggle-exam-mode', isExam).catch(err => {
+              console.warn("Failed to toggle native exam mode:", err);
+          });
+      }
+  }, [isExam]);
 
   // Auto-save exercise metadata
   useEffect(() => {

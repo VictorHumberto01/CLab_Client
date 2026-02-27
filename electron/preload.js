@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('electron', {
     }
   },
   invoke: (channel, data) => {
-    const validChannels = ['show-save-dialog', 'show-open-dialog', 'run-code'];
+    const validChannels = ['show-save-dialog', 'show-open-dialog', 'run-code', 'toggle-exam-mode'];
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, data);
     }

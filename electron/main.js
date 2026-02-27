@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut } = require('electron');
 const path = require('path');
 const serve = require('electron-serve');
 
@@ -18,12 +18,13 @@ function createWindow() {
     },
     // macOS: use hiddenInset for native traffic lights
     // Windows/Linux: use frameless window
-    titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
-    frame: isMac, // macOS uses frame with hidden title bar, Windows needs frameless
+    titleBarStyle: 'hidden',
+    // Always use frame: true with titleBarStyle hidden so Window Controls Overlay (WCO) works on Windows
+    frame: true, 
     titleBarOverlay: !isMac ? {
       color: '#0a0a0b',
       symbolColor: '#ffffff',
-      height: 40
+      height: 38
     } : false,
     backgroundColor: '#0a0a0b',
   });
@@ -61,4 +62,34 @@ ipcMain.handle('run-code', async (event, data) => {
     // but the Client uses fetch to Go server directly usually.
     // If you need native stuff, add here.
     return { success: true };
+});
+
+ipcMain.handle('toggle-exam-mode', async (event, isExam) => {
+  if (mainWindow) {
+    if (isExam) {
+      mainWindow.setKiosk(true);
+      mainWindow.setAlwaysOnTop(true, 'screen-saver');
+      
+      // Hook system shortcuts on Windows to aggressively prevent exiting
+      if (!isMac) {
+          try {
+              globalShortcut.register('Alt+Tab', () => { console.log('Blocked Alt+Tab'); });
+              globalShortcut.register('CommandOrControl+Tab', () => { console.log('Blocked Ctrl+Tab'); });
+              globalShortcut.register('Alt+Shift+Tab', () => { console.log('Blocked Alt+Shift+Tab'); });
+              globalShortcut.register('Alt+F4', () => { console.log('Blocked Alt+F4'); });
+              globalShortcut.register('CommandOrControl+Esc', () => { console.log('Blocked Ctrl+Esc'); });
+          } catch(e) {
+              console.error("Failed to register some global shortcuts", e);
+          }
+      }
+    } else {
+      mainWindow.setKiosk(false);
+      mainWindow.setAlwaysOnTop(false, 'normal');
+      mainWindow.setFullScreen(false);
+      if (!isMac) {
+          globalShortcut.unregisterAll();
+      }
+    }
+  }
+  return { success: true };
 });

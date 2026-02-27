@@ -106,6 +106,7 @@ export default function StudentDashboard() {
           else localStorage.removeItem('clab-exercise-expire-date');
 
           localStorage.setItem('clab-target-initial-code', ex.initialCode || "");
+          localStorage.setItem('clab-exercise-id', ex.id.toString());
           
           router.push('/');
       }
@@ -251,16 +252,18 @@ export default function StudentDashboard() {
                                                                 </h4>
                                                                 <button 
                                                                     onClick={() => handleSolveExercise(ex, topic)}
-                                                                    disabled={isExpired && !selectedClassroom.activeExamId}
+                                                                    disabled={isExpired || (topic.isExam && selectedClassroom.activeExamCompleted)}
                                                                     className={`px-3 py-1 text-[10px] font-bold rounded uppercase transition-colors ${
-                                                                        selectedClassroom.activeExamId 
-                                                                            ? 'bg-red-500 hover:bg-red-600 text-white'
+                                                                        topic.isExam && selectedClassroom.activeExamCompleted
+                                                                            ? 'bg-green-500/20 text-green-500 cursor-not-allowed border border-green-500/50'
                                                                             : isExpired 
                                                                                 ? 'bg-surface-hover text-secondary cursor-not-allowed'
-                                                                                : 'bg-primary hover:bg-primary-hover text-white'
+                                                                                : selectedClassroom.activeExamId 
+                                                                                    ? 'bg-red-500 hover:bg-red-600 text-white'
+                                                                                    : 'bg-primary hover:bg-primary-hover text-white'
                                                                     }`}
                                                                 >
-                                                                    {selectedClassroom.activeExamId ? 'Resolver' : isExpired ? 'Expirado' : 'Resolver'}
+                                                                    {topic.isExam && selectedClassroom.activeExamCompleted ? 'Finalizado' : isExpired ? 'Expirado' : selectedClassroom.activeExamId ? 'Resolver' : 'Resolver'}
                                                                 </button>
                                                             </div>
                                                             <p className="text-xs text-secondary line-clamp-2 leading-relaxed mb-3">{ex.description}</p>

@@ -15,7 +15,8 @@
     "electron-dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
     "electron-build": "next build && electron-builder",
     "pack": "electron-builder --dir",
-    "build:linux": "next build && electron-builder --linux --x64"
+    "build:linux": "next build && electron-builder --linux --x64",
+    "build:windows": "next build && electron-builder --win --x64"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
