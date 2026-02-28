@@ -1,6 +1,6 @@
 {
   "name": "clab-ide",
-  "version": "0.1.0",
+  "version": "0.1.0-beta",
   "author": {
     "name": "Victor Humberto",
     "email": "contact@clab.ide"
@@ -57,7 +57,7 @@
     "linux": {
       "target": [
         "AppImage",
-        "deb"
+        "flatpak"
       ],
       "category": "Development"
     },
