@@ -63,8 +63,25 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.removeItem === 'function') {
-      window.localStorage.removeItem('token');
+    if (typeof window !== 'undefined' && window.localStorage) {
+      // Create a list of keys to preserve
+      const preserveKeys = [
+          'clab-server-ip', 
+          'clab-theme-id', 
+          'clab-custom-themes'
+      ];
+      
+      // Iterate over all keys in localStorage
+      const keysToRemove = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && !preserveKeys.includes(key)) {
+          keysToRemove.push(key);
+        }
+      }
+
+      // Remove the non-preserved keys
+      keysToRemove.forEach(key => window.localStorage.removeItem(key));
     }
     setUser(null);
     router.push('/');
