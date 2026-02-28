@@ -140,7 +140,35 @@ int main() {
                 // Find a classroom with an active exam
                 const classroomWithExam = json.data.find(cls => cls.activeExamId);
                 
+                // If there's an active exam, we also need to check if the user is a teacher of that class
+                // Or if they've manually escaped it.
                 if (classroomWithExam) {
+                    
+                    // IF TEACHER: Bypass exam mode
+                    if (user && user.role === 'teacher') {
+                        if (isExam) {
+                            setIsExam(false);
+                            setExamQuestions([]);
+                        }
+                        return; // Auto-bypass for teachers completely.
+                    }
+
+                    // IF ESCAPED: Bypass until restart
+                    if (sessionStorage.getItem('clab-escaped-exam') === 'true') {
+                        return;
+                    }
+                    
+                    // Check if exam is already completed / expired for this student
+                    if (classroomWithExam.activeExamCompleted) {
+                         if (isExam) {
+                            setIsExam(false);
+                            setExamQuestions([]);
+                            localStorage.removeItem('clab-classroom-id');
+                            localStorage.removeItem('clab-topic-id');
+                            localStorage.removeItem('clab-exercise-is-exam');
+                        }
+                        return; // Done
+                    }
                     // Fetch topics for this classroom
                     const topicsRes = await fetch(`${baseUrl}/classrooms/${classroomWithExam.id}/topics`, {
                         headers: { 'Authorization': `Bearer ${token}` }
@@ -163,6 +191,9 @@ int main() {
                                 localStorage.setItem('clab-topic-id', examTopic.id.toString());
                                 localStorage.setItem('clab-exercise-is-exam', 'true');
                                 
+                                // Clean up any escaped flag, since we are legitimately entering
+                                sessionStorage.removeItem('clab-escaped-exam');
+                                
                                 // If no exercise is currently selected, auto-select the first one
                                 if (!exerciseId && examTopic.exercises[0]) {
                                     const firstQ = examTopic.exercises[0];
@@ -179,6 +210,10 @@ int main() {
                     if (isExam) {
                         setIsExam(false);
                         setExamQuestions([]);
+                        localStorage.removeItem('clab-classroom-id');
+                        localStorage.removeItem('clab-topic-id');
+                        localStorage.removeItem('clab-exercise-is-exam');
+                        sessionStorage.removeItem('clab-escaped-exam');
                     }
                 }
             }
@@ -402,7 +437,8 @@ int main() {
     wsRef.current.send(JSON.stringify({ 
         type: "run_code", 
         payload: code, 
-        exerciseId: 0 
+        exerciseId: 0,
+        isExam: isExam
     }));
   };
 
@@ -432,7 +468,8 @@ int main() {
     wsRef.current.send(JSON.stringify({ 
         type: "run_code", 
         payload: code, 
-        exerciseId: parseInt(exerciseId) 
+        exerciseId: parseInt(exerciseId),
+        isExam: isExam
     }));
     
     // Check if all exam questions are now submitted
