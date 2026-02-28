@@ -41,6 +41,7 @@ jobs:
       - name: Build and Publish Electron App
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEBUG: "electron-builder,electron-builder:*,@malept/flatpak-bundler"
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
             npx electron-builder --linux --x64 --publish always

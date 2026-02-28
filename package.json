@@ -1,6 +1,7 @@
 {
   "name": "clab-ide",
   "version": "0.1.0-beta",
+  "description": "CLab IDE Frontend Application",
   "author": {
     "name": "Victor Humberto",
     "email": "contact@clab.ide"
