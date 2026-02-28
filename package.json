@@ -1,10 +1,10 @@
 {
   "name": "clab-ide",
-  "version": "0.1.1-beta",
+  "version": "0.1.2-beta",
   "description": "CLab IDE Frontend Application",
   "author": {
     "name": "Victor Humberto",
-    "email": "contact@clab.ide"
+    "email": "victor.humberto.dev@gmail.com"
   },
   "private": true,
   "main": "electron/main.js",
