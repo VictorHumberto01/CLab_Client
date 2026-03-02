@@ -21,7 +21,7 @@ const IDE = () => {
   const [code, setCode] = useState(`#include <stdio.h>
 
 int main() {
-    printf("Hello, World!\\n");
+    printf("Hello, CLab!\\n");
     return 0;
 }`);
   const [isRunning, setIsRunning] = useState(false);
