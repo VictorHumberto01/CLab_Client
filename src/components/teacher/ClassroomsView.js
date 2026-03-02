@@ -28,7 +28,8 @@ import {
   Activity,
   Loader2,
   UserPlus,
-  GraduationCap
+  GraduationCap,
+  KeyRound
 } from "lucide-react";
 
 const ClassroomsView = () => {
@@ -66,6 +67,8 @@ const ClassroomsView = () => {
     const [expandedExercise, setExpandedExercise] = useState(null);
     const [selectedSubmission, setSelectedSubmission] = useState(null);
     const [teacherEmail, setTeacherEmail] = useState("");
+    const [showResetModal, setShowResetModal] = useState(false);
+    const [resetData, setResetData] = useState({ studentName: "", newPassword: "" });
 
     const fetchClassrooms = async () => {
         setLoading(true);
@@ -134,6 +137,22 @@ const ClassroomsView = () => {
             }
         } catch (err) {
             alert("Erro ao remover aluno.");
+            console.error(err);
+        }
+    };
+
+    const handleResetStudentPassword = async (studentId, studentName) => {
+        if (!selectedClassroom) return;
+        if (!confirm(`Tem certeza que deseja resetar a senha de ${studentName}? Ele(a) perderá acesso até usar a nova senha.`)) return;
+
+        try {
+            const res = await api.post(`/classrooms/${selectedClassroom.id}/students/${studentId}/reset-password`);
+            if (res.data.success && res.data.data.newPassword) {
+                setResetData({ studentName, newPassword: res.data.data.newPassword });
+                setShowResetModal(true);
+            }
+        } catch (err) {
+            alert(err.response?.data?.error || "Erro ao resetar senha do aluno.");
             console.error(err);
         }
     };
@@ -458,7 +477,16 @@ const ClassroomsView = () => {
                                                             <Activity size={14} />
                                                             <span>Atividade</span>
                                                         </button>
-                                                        <button 
+                                                        {selectedClassroom.teacherId === (JSON.parse(localStorage.getItem('user') || '{}').id) && (
+                                                            <button 
+                                                                onClick={() => handleResetStudentPassword(student.id, student.name || student.email.split('@')[0])}
+                                                                className="p-2 rounded-lg text-amber-500 hover:bg-amber-500/10 transition-colors"
+                                                                title="Resetar Senha"
+                                                            >
+                                                                <KeyRound size={14} />
+                                                            </button>
+                                                        )}
+                                                        <button  
                                                             onClick={() => handleRemoveStudent(student.id)}
                                                             className="p-2 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
                                                             title="Remover aluno"
@@ -1109,6 +1137,46 @@ const ClassroomsView = () => {
                                         )}
                                     </div>
                                 </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Reset Password Success Modal */}
+                <AnimatePresence>
+                    {showResetModal && (
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[70] p-4"
+                        >
+                            <motion.div 
+                                initial={{ scale: 0.95, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.95, opacity: 0 }}
+                                className="bg-surface border border-border rounded-2xl p-8 w-full max-w-sm text-center"
+                            >
+                                <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-6">
+                                    <KeyRound size={32} className="text-green-500" />
+                                </div>
+                                <h2 className="text-xl font-bold text-foreground mb-2">Senha Resetada!</h2>
+                                <p className="text-sm text-secondary mb-6">
+                                    A senha de <span className="font-bold text-foreground">{resetData.studentName}</span> foi alterada para:
+                                </p>
+                                
+                                <div className="bg-background border border-border p-4 rounded-xl mb-6 flex items-center justify-center">
+                                    <span className="font-mono text-2xl font-bold tracking-widest text-primary selection:bg-primary/30">
+                                        {resetData.newPassword}
+                                    </span>
+                                </div>
+
+                                <button 
+                                    onClick={() => setShowResetModal(false)}
+                                    className="w-full bg-primary hover:bg-primary-hover text-white py-3 rounded-xl font-medium transition-colors"
+                                >
+                                    Entendido
+                                </button>
                             </motion.div>
                         </motion.div>
                     )}

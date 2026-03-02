@@ -104,18 +104,20 @@ const MenuBar = ({ runInCloud, stopCode, isRunning, showAiPanel, setShowAiPanel,
 
       {/* Right: Tools & Profile */}
       <div className={`flex items-center space-x-2 no-drag ${isMac ? 'pr-2' : 'pr-36'}`}>
-          <button
-          onClick={() => setShowAiPanel(!showAiPanel)}
-          className={`p-1.5 rounded transition-all flex items-center text-xs font-medium ${
-            showAiPanel 
-              ? 'bg-primary/20 text-primary' 
-              : 'text-secondary hover:text-foreground hover:bg-surface-hover'
-          }`}
-          title="Alternar Assistente IA"
-        >
-          <Bot size={14} className="mr-1.5" />
-          Assistente IA
-        </button>
+          {user && (
+            <button
+              onClick={() => setShowAiPanel(!showAiPanel)}
+              className={`p-1.5 rounded transition-all flex items-center text-xs font-medium ${
+                showAiPanel 
+                  ? 'bg-primary/20 text-primary' 
+                  : 'text-secondary hover:text-foreground hover:bg-surface-hover'
+              }`}
+              title="Alternar Assistente IA"
+            >
+              <Bot size={14} className="mr-1.5" />
+              Assistente IA
+            </button>
+          )}
 
         <div className="h-4 w-px bg-border mx-1" />
 

@@ -34,6 +34,16 @@ const Terminal = ({ onData, onResize, terminalRef: externalRef }) => {
     term.loadAddon(fitAddon);
     term.loadAddon(webLinksAddon);
 
+    // Provide Ctrl+L shortcut to clear the terminal
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.ctrlKey && e.key.toLowerCase() === 'l' && e.type === 'keydown') {
+        e.preventDefault();
+        term.clear();
+        return false;
+      }
+      return true;
+    });
+
     term.open(terminalRef.current);
     fitAddon.fit();
 

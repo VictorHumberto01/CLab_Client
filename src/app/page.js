@@ -9,6 +9,7 @@ import AnalysisPanel from "../components/AIPanel/AnalysisPanel";
 import Terminal from "../components/Terminal/Terminal";
 import { useAuth } from "../context/AuthContext";
 import { getWsUrl } from "../utils/api";
+import SetupIntro from "../components/SetupIntro";
 
 // Import Monaco Editor dynamically to avoid SSR issues
 const MonacoEditor = dynamic(
@@ -29,7 +30,22 @@ int main() {
   const [exerciseDescription, setExerciseDescription] = useState("");
   const [isExam, setIsExam] = useState(false);
   const [expireDate, setExpireDate] = useState(null);
-  const [showAiPanel, setShowAiPanel] = useState(true);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const [showIntro, setShowIntro] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hasSeenIntro = localStorage.getItem('clab-setup-intro-seen');
+      if (!hasSeenIntro) {
+        setShowIntro(true);
+      }
+    }
+  }, []);
+
+  const handleIntroComplete = () => {
+    setShowIntro(false);
+    localStorage.setItem('clab-setup-intro-seen', 'true');
+  };
   
   // WebSocket State
   const wsRef = useRef(null);
@@ -48,6 +64,15 @@ int main() {
     setResizeTrigger(prev => prev + 1);
   }, [showAiPanel]);
 
+  // Sync AI panel visibility with user auth state
+  useEffect(() => {
+    if (user) {
+      setShowAiPanel(true);
+    } else {
+      setShowAiPanel(false);
+    }
+  }, [user]);
+
   // Restore code and state
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -55,7 +80,7 @@ int main() {
         const defaultCode = `#include <stdio.h>
 
 int main() {
-    printf("Hello, World!\\n");
+    printf("Hello, CLab!\\n");
     return 0;
 }`;
 
@@ -663,7 +688,7 @@ int main() {
         </div>
 
         {/* AI Analysis Panel or Exam Questions */}
-        {(showAiPanel && !isExam) ? (
+        {(showAiPanel && !isExam && user) ? (
           <div className="w-[350px] shrink-0 border-l border-border bg-background">
              <AnalysisPanel
                 code={code}
@@ -720,6 +745,7 @@ int main() {
       </div>
 
     </div>
+    {showIntro && <SetupIntro onComplete={handleIntroComplete} />}
   </div>
   );
 };

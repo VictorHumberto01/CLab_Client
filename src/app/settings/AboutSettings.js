@@ -77,7 +77,7 @@ const AboutSettings = ({ currentTheme, onTriggerPanic }) => {
                     </div>
                     <div className="flex">
                     <span className="text-primary w-20">version</span>
-                    <span className="text-foreground">0.1.0-alpha</span>
+                    <span className="text-foreground">0.1.2-beta</span>
                     </div>
 
                     {/* STAGE 2: Specs */}

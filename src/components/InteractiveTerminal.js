@@ -103,6 +103,12 @@ const InteractiveTerminal = ({ steps = [], isComplex, onComplete, onCancel }) =>
                     type="text"
                     value={currentInput}
                     onChange={(e) => setCurrentInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.ctrlKey && e.key.toLowerCase() === 'l') {
+                        e.preventDefault();
+                        setHistory([]);
+                      }
+                    }}
                     className="flex-1 bg-transparent border-none outline-none text-white placeholder-gray-700"
                     placeholder="Enter value..."
                     autoFocus
