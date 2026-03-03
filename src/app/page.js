@@ -10,6 +10,7 @@ import Terminal from "../components/Terminal/Terminal";
 import { useAuth } from "../context/AuthContext";
 import { getWsUrl } from "../utils/api";
 import SetupIntro from "../components/SetupIntro";
+import FileExplorer from "../components/Editor/FileExplorer";
 
 // Import Monaco Editor dynamically to avoid SSR issues
 const MonacoEditor = dynamic(
@@ -18,12 +19,16 @@ const MonacoEditor = dynamic(
 );
 
 const IDE = () => {
-  const [code, setCode] = useState(`#include <stdio.h>
+  const defaultCode = `#include <stdio.h>\n\nint main() {\n    printf("Hello, CLab!\\n");\n    return 0;\n}`;
+  const [files, setFiles] = useState([{ name: 'program.c', content: defaultCode }]);
+  const [activeFileName, setActiveFileName] = useState('program.c');
 
-int main() {
-    printf("Hello, CLab!\\n");
-    return 0;
-}`);
+  const activeFile = files.find(f => f.name === activeFileName) || files[0];
+  const code = activeFile?.content || "";
+  
+  const setCode = (newContent) => {
+      setFiles(prev => prev.map(f => f.name === activeFileName ? { ...f, content: newContent } : f));
+  };
   const [isRunning, setIsRunning] = useState(false);
   const [exerciseId, setExerciseId] = useState(null);
   const [exercise, setExercise] = useState(null);
@@ -134,12 +139,12 @@ int main() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
         if (exerciseId) {
-            localStorage.setItem(`clab-code-exercise-${exerciseId}`, code);
+            localStorage.setItem(`clab-code-exercise-${exerciseId}`, files.find(f => f.name === 'program.c')?.content || code);
         } else {
-            localStorage.setItem('clab-code-scratchpad', code);
+            localStorage.setItem('clab-code-scratchpad', files.find(f => f.name === 'program.c')?.content || code);
         }
     }
-  }, [code, exerciseId]);
+  }, [files, code, exerciseId]);
 
   // Exam Mode State
   const [examQuestions, setExamQuestions] = useState([]);
@@ -370,11 +375,14 @@ int main() {
                     } else {
                         const aiMatch = text.match(/\{.*"type":"ai_analysis".*\}/);
                         const statusMatch = text.match(/\{.*"type":"status".*\}/);
+                        const vfsMatch = text.match(/\{.*"type":"vfs_update".*\}/);
                         
                         if (aiMatch) {
                             try { jsonPayload = JSON.parse(aiMatch[0]); } catch(e){}
                         } else if (statusMatch) {
                             try { jsonPayload = JSON.parse(statusMatch[0]); } catch(e){}
+                        } else if (vfsMatch) {
+                            try { jsonPayload = JSON.parse(vfsMatch[0]); } catch(e){}
                         }
 
                         outputText = outputText.replace(/\{.*"type":".*?".*?\}/g, "");
@@ -385,7 +393,21 @@ int main() {
             }
 
             if (jsonPayload) {
-                if (jsonPayload.type === 'ai_analysis') {
+                if (jsonPayload.type === 'vfs_update' && jsonPayload.files) {
+                    setFiles(prev => {
+                        const newFiles = [...prev];
+                        jsonPayload.files.forEach(incomingVf => {
+                            if (incomingVf.name === 'program.c') return; // Do not overwrite active source
+                            const existingIdx = newFiles.findIndex(f => f.name === incomingVf.name);
+                            if (existingIdx >= 0) {
+                                newFiles[existingIdx] = incomingVf;
+                            } else {
+                                newFiles.push(incomingVf);
+                            }
+                        });
+                        return newFiles;
+                    });
+                } else if (jsonPayload.type === 'ai_analysis') {
                      setShowAiPanel(true);
                      setAiAnalysis(jsonPayload.payload);
                      setIsAnalyzing(false);
@@ -461,7 +483,8 @@ int main() {
 
     wsRef.current.send(JSON.stringify({ 
         type: "run_code", 
-        payload: code, 
+        payload: files.find(f => f.name === 'program.c')?.content || code, 
+        files: files,
         exerciseId: 0,
         isExam: isExam
     }));
@@ -492,7 +515,8 @@ int main() {
 
     wsRef.current.send(JSON.stringify({ 
         type: "run_code", 
-        payload: code, 
+        payload: files.find(f => f.name === 'program.c')?.content || code, 
+        files: files,
         exerciseId: parseInt(exerciseId),
         isExam: isExam
     }));
@@ -632,14 +656,41 @@ int main() {
 
         {/* Main Editor + Terminal Section */}
         <div className="flex flex-col flex-1 min-w-0">
-          {/* Editor Area */}
-          <div className="flex-1 min-h-0 border-r border-border bg-background">
-            <MonacoEditor 
-              code={code}
-              setCode={setCode}
-              language="c"
-              triggerResize={resizeTrigger}
+          
+          <div className="flex flex-1 min-h-0 border-r border-border bg-background">
+            {/* Sidebar File Explorer */}
+            <FileExplorer 
+              files={files}
+              activeFileName={activeFileName}
+              setActiveFileName={setActiveFileName}
+              onAddFile={() => {
+                const name = prompt("Nome do novo arquivo (ex: utils.h):");
+                if (name && !files.find(f => f.name === name)) {
+                    setFiles([...files, { name, content: "" }]);
+                    setActiveFileName(name);
+                }
+              }}
+              onDeleteFile={(name) => {
+                if (confirm(`Deletar ${name}?`)) {
+                    setFiles(files.filter(f => f.name !== name));
+                    if (activeFileName === name) setActiveFileName('program.c');
+                }
+              }}
             />
+            {/* Editor Area */}
+            <div className="flex-1 min-h-0 flex flex-col">
+                <div className="flex items-center px-4 py-[7px] border-b border-white/5 bg-surface text-secondary text-sm">
+                   {activeFileName}
+                </div>
+                <div className="flex-1 min-h-0">
+                    <MonacoEditor 
+                      code={code}
+                      setCode={setCode}
+                      language={activeFileName.endsWith('.txt') ? 'plaintext' : 'c'}
+                      triggerResize={resizeTrigger + activeFileName}
+                    />
+                </div>
+            </div>
           </div>
 
           {/* Terminal Panel */}
