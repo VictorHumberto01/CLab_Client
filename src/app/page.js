@@ -60,6 +60,11 @@ int main() {
   const [aiAnalysis, setAiAnalysis] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // Exam Blocking State
+  const [isExamBlocked, setIsExamBlocked] = useState(false);
+  const [showFirstExamDialog, setShowFirstExamDialog] = useState(false);
+  const blurTimerRef = useRef(null);
+
   useEffect(() => {
     setResizeTrigger(prev => prev + 1);
   }, [showAiPanel]);
@@ -141,6 +146,43 @@ int main() {
     }
   }, [code, exerciseId]);
 
+  // Window Focus Monitoring for Exam Mode
+  useEffect(() => {
+    if (!isExam) {
+      if (blurTimerRef.current) {
+        clearTimeout(blurTimerRef.current);
+      }
+      return;
+    }
+
+    const handleBlur = () => {
+      if (isExamBlocked || showFirstExamDialog) return;
+      // Start 5-second timer to block exam
+      blurTimerRef.current = setTimeout(() => {
+        setIsExamBlocked(true);
+      }, 5000);
+    };
+
+    const handleFocus = () => {
+      // Clear timer if focus is regained before 5 seconds
+      if (blurTimerRef.current) {
+        clearTimeout(blurTimerRef.current);
+        blurTimerRef.current = null;
+      }
+    };
+
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
+      if (blurTimerRef.current) {
+        clearTimeout(blurTimerRef.current);
+      }
+    };
+  }, [isExam, isExamBlocked]);
+
   // Exam Mode State
   const [examQuestions, setExamQuestions] = useState([]);
   const [examTopicTitle, setExamTopicTitle] = useState("");
@@ -211,6 +253,11 @@ int main() {
                                 setExamQuestions(examTopic.exercises);
                                 setExamTopicTitle(examTopic.title);
                                 
+                                // Show first exam warning
+                                if (!localStorage.getItem('clab-first-exam-seen')) {
+                                    setShowFirstExamDialog(true);
+                                }
+                                
                                 // Store context
                                 localStorage.setItem('clab-classroom-id', classroomWithExam.id.toString());
                                 localStorage.setItem('clab-topic-id', examTopic.id.toString());
@@ -234,6 +281,7 @@ int main() {
                     // No active exam, clear exam state if it was set
                     if (isExam) {
                         setIsExam(false);
+                        setIsExamBlocked(false);
                         setExamQuestions([]);
                         localStorage.removeItem('clab-classroom-id');
                         localStorage.removeItem('clab-topic-id');
@@ -507,6 +555,7 @@ int main() {
                 
                 // Clear exam state
                 setIsExam(false);
+                setIsExamBlocked(false);
                 setExamQuestions([]);
                 setSubmittedQuestions(new Set());
                 setExerciseId(null);
@@ -567,6 +616,7 @@ int main() {
       setExercise(null);
       setExerciseDescription("");
       setIsExam(false);
+      setIsExamBlocked(false);
       setExpireDate(null);
       
       if (typeof window !== 'undefined') {
@@ -592,8 +642,54 @@ int main() {
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
+      {/* Exam Blocked Overlay */}
+      {isExamBlocked && (
+        <div className="absolute inset-0 z-[9999] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
+          <Shield size={64} className="text-red-500 mb-6 animate-pulse" />
+          <h1 className="text-4xl font-bold text-white mb-4">Prova Bloqueada</h1>
+          <p className="text-lg text-zinc-300 max-w-lg mb-8">
+            Você perdeu o foco da janela da prova por mais de 5 segundos. 
+            A sessão foi bloqueada por medidas de segurança.
+          </p>
+          <button 
+            onClick={handleExitExercise}
+            className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors flex items-center space-x-2"
+          >
+            <span>Sair do Exame</span>
+          </button>
+        </div>
+      )}
+
+      {/* First Exam Dialog */}
+      {showFirstExamDialog && (
+        <div className="absolute inset-0 z-[10000] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-left">
+          <div className="bg-surface border border-border rounded-2xl p-8 max-w-lg w-full shadow-2xl flex flex-col items-center">
+            <Shield size={56} className="text-primary mb-6" />
+            <h2 className="text-3xl font-bold text-foreground mb-4 text-center">Modo Prova Ativado</h2>
+            <div className="text-secondary text-sm space-y-4 mb-8 text-left w-full">
+              <p>Neste modo, o ambiente do CLab fica com recursos restritos para avaliação:</p>
+              <ul className="list-disc pl-5 space-y-2 text-foreground font-medium">
+                <li>O assistente de <strong>Inteligência Artificial</strong> está desativado.</li>
+                <li>O <strong>foco da janela</strong> é monitorado. Se você sair ou minimizar a janela por mais de 5 segundos, a prova será <strong className="text-red-400">bloqueada</strong>.</li>
+                <li>Atalhos de sistema e tentativas de colar código podem ser registrados.</li>
+              </ul>
+              <p className="pt-2 italic text-xs text-secondary/70">Este aviso só aparece na sua primeira prova.</p>
+            </div>
+            <button 
+              onClick={() => {
+                setShowFirstExamDialog(false);
+                localStorage.setItem('clab-first-exam-seen', 'true');
+              }}
+              className="w-full px-6 py-3 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl transition-all"
+            >
+              Entendi, começar a prova
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={`flex-1 flex flex-col min-w-0 ${isExamBlocked || showFirstExamDialog ? 'pointer-events-none blur-sm' : ''}`}>
         <MenuBar 
             runInCloud={runCode} 
             stopCode={stopCode} 

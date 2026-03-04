@@ -93,7 +93,29 @@ const WelcomeStep = () => (
 );
 
 // ---------------------------------------------------------------------------
-// Step 1 — Server Connection
+// Step 1 — Beta Warning
+// ---------------------------------------------------------------------------
+const BetaWarningStep = () => (
+  <motion.div variants={stagger} initial="hidden" animate="visible" className="flex flex-col items-center text-center px-4">
+    <motion.div variants={fadeBlur} className="relative mb-10">
+      <div className="absolute -inset-4 rounded-[2rem] bg-orange-500/10 blur-3xl" />
+      <div className="relative w-[88px] h-[88px] rounded-[1.75rem] bg-surface border border-border flex items-center justify-center shadow-xl">
+        <Terminal className="w-10 h-10 text-orange-400" strokeWidth={1.5} />
+      </div>
+    </motion.div>
+
+    <motion.h2 variants={fadeBlur} className="text-2xl font-bold text-foreground mb-2 tracking-tight">
+      Aviso Importante
+    </motion.h2>
+
+    <motion.p variants={fadeBlur} className="text-sm text-secondary max-w-sm leading-relaxed mb-6">
+      O CLab ainda está em fase <strong className="text-foreground">Beta</strong>. Isso significa que você pode encontrar instabilidades ou alguns bugs. Agradecemos a sua compreensão e feedback!
+    </motion.p>
+  </motion.div>
+);
+
+// ---------------------------------------------------------------------------
+// Step 2 — Server Connection
 // ---------------------------------------------------------------------------
 const ServerStep = ({ serverUrl, setServerUrl }) => {
   const [testing, setTesting] = useState(false);
@@ -585,7 +607,7 @@ const ReadyStep = () => (
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
-const STEPS = ["welcome", "server", "login", "theme", "tour", "ready"];
+const STEPS = ["welcome", "beta", "server", "login", "theme", "tour", "ready"];
 
 const SetupIntro = ({ onComplete }) => {
   const [step, setStep] = useState(0);
@@ -661,6 +683,7 @@ const SetupIntro = ({ onComplete }) => {
               <AnimatePresence initial={false} custom={direction} mode="wait">
                 <motion.div key={step} custom={direction} variants={pageVariants} initial="enter" animate="center" exit="exit" className="w-full">
                   {id === "welcome" && <WelcomeStep />}
+                  {id === "beta" && <BetaWarningStep />}
                   {id === "server" && <ServerStep serverUrl={serverUrl} setServerUrl={setServerUrl} />}
                   {id === "login" && <LoginStep />}
                   {id === "theme" && <ThemeStep selectedTheme={selectedTheme} onSelect={handleThemeSelect} themes={availableThemes} />}
